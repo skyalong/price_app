@@ -29,23 +29,28 @@ jobs:
             zlib1g-dev libncurses5-dev libncursesw5-dev \
             cmake libffi-dev libssl-dev
 
-      # 🔑 关键步骤：接受 Android SDK 许可证
-      - name: Accept Android SDK licenses
-        run: |
-          mkdir -p ~/.android
-          echo "### User Sources for Android SDK Manager" > ~/.android/repositories.cfg
-          yes | sdkmanager --licenses || true
-          yes | ~/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager --licenses || true
-
       - name: Install Buildozer
         run: |
           pip install --upgrade pip
           pip install cython buildozer
 
+      # 🔑 关键步骤：先接受许可证，再安装指定版本的 Build Tools
+      - name: Accept licenses and install Build Tools 34
+        run: |
+          # 创建目录并接受所有许可证
+          mkdir -p ~/.android
+          echo "### User Sources for Android SDK Manager" > ~/.android/repositories.cfg
+          
+          # 先运行一次 buildozer 来初始化 SDK
+          buildozer android debug || true
+          
+          # 接受所有许可证
+          yes | ~/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager --licenses || true
+          
+          # 安装指定版本的 Build Tools
+          ~/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager --sdk_root=/home/runner/.buildozer/android/platform/android-sdk "build-tools;34.0.0"
 
       - name: Build APK
-        env:
-          ANDROID_BUILD_TOOLS_VERSION: 34.0.0
         run: |
           buildozer -v android debug
 
