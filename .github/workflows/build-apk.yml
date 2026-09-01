@@ -42,7 +42,10 @@ jobs:
           pip install --upgrade pip
           pip install cython buildozer
 
+
       - name: Build APK
+        env:
+          ANDROID_BUILD_TOOLS_VERSION: 34.0.0
         run: |
           buildozer -v android debug
 
