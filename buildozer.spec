@@ -17,7 +17,7 @@ android.permissions = INTERNET,READ_EXTERNAL_STORAGE,WRITE_EXTERNAL_STORAGE
 
 # Android SDK/NDK 配置（使用稳定版本）
 android.api = 33
-android.ndk = 25c
+android.ndk = 23C
 android.minapi = 21
 android.sdk = 33
 

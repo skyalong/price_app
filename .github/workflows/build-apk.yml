@@ -29,6 +29,13 @@ jobs:
             zlib1g-dev libncurses5-dev libncursesw5-dev \
             cmake libffi-dev libssl-dev
 
+      # 🔑 关键步骤：接受 Android SDK 许可证
+      - name: Accept Android SDK licenses
+        run: |
+          mkdir -p ~/.android
+          echo "### User Sources for Android SDK Manager" > ~/.android/repositories.cfg
+          yes | sdkmanager --licenses || true
+
       - name: Install Buildozer
         run: |
           pip install --upgrade pip
