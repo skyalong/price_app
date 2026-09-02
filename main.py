@@ -12,40 +12,42 @@ from kivymd.uix.label import MDLabel
 from kivymd.uix.datatables import MDDataTable
 from kivymd.uix.boxlayout import MDBoxLayout
 from kivymd.uix.scrollview import MDScrollView
-from kivymd.uix.floatlayout import MDFloatLayout
 import sqlite3
 import re
 import os
-from openpyxl import Workbook, load_workbook
-from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
 
-
-# ==================== Android 兼容处理 ====================
-# 判断是否在 Android 上运行
-IS_ANDROID = False
-try:
-    from android.permissions import request_permissions, Permission
-    IS_ANDROID = True
-except ImportError:
-    pass
-
-# 获取正确的数据库路径
+# ==================== 获取正确的数据库路径 ====================
 def get_db_path():
-    if IS_ANDROID:
-        # Android 上使用应用私有目录
-        from android.storage import app_storage_path
-        return os.path.join(app_storage_path(), "business.db")
-    else:
-        return "business.db"
+    """获取应用私有目录下的数据库路径"""
+    try:
+        from kivy.utils import platform
+        if platform == 'android':
+            try:
+                from android.storage import app_storage_path
+                path = os.path.join(app_storage_path(), 'business.db')
+                print(f"Android 数据库路径: {path}")
+                return path
+            except:
+                print("无法获取 Android 存储路径，使用默认")
+                return 'business.db'
+        else:
+            return 'business.db'
+    except:
+        return 'business.db'
 
 # ==================== 全局配置 ====================
 ADMIN_PASSWORD = "432"
-EXCEL_HEADERS = ["检定项目", "型号规格", "测量范围", "价格"]
 DB_NAME = get_db_path()
+print(f"数据库路径: {DB_NAME}")
 
-# 只在非 Android 环境下设置窗口大小
-if not IS_ANDROID:
+# 只在非 Android 环境设置窗口大小
+try:
+    from kivy.utils import platform
+    if platform != 'android':
+        Window.size = (360, 640)
+except:
     Window.size = (360, 640)
+
 Window.clearcolor = get_color_from_hex("#f5f5f5")
 
 # ==================== 数据库初始化 ====================
@@ -64,6 +66,7 @@ def init_db():
         """)
         conn.commit()
         conn.close()
+        print("数据库初始化成功")
         return True
     except Exception as e:
         print(f"数据库初始化失败: {e}")
@@ -75,7 +78,7 @@ def parse_price(price_str):
         return float(nums[0])
     return 0.0
 
-# ==================== 页面定义 ====================
+# ==================== KV 字符串 ====================
 KV = '''
 ScreenManager:
     LoginScreen:
@@ -83,7 +86,6 @@ ScreenManager:
     AdminScreen:
     QuoteScreen:
 
-# 密码登录页
 <LoginScreen>:
     name: "login"
     MDBoxLayout:
@@ -118,7 +120,6 @@ ScreenManager:
             height: dp(50)
             on_press: app.root.current = "client"
 
-# 普通查询页
 <ClientScreen>:
     name: "client"
     MDBoxLayout:
@@ -165,7 +166,6 @@ ScreenManager:
             text: "管理员入口"
             on_press: app.root.current = "login"
 
-# 管理员页面
 <AdminScreen>:
     name: "admin"
     MDBoxLayout:
@@ -223,10 +223,6 @@ ScreenManager:
             height: dp(40)
 
             MDRaisedButton:
-                text: "导入Excel"
-                md_bg_color: "#9b59b6"
-                on_press: root.import_excel()
-            MDRaisedButton:
                 text: "刷新"
                 md_bg_color: "#3498db"
                 on_press: root.load_list()
@@ -238,7 +234,6 @@ ScreenManager:
                 size_hint: 1, None
                 height: dp(600)
 
-# 批量报价页面
 <QuoteScreen>:
     name: "quote"
     MDBoxLayout:
@@ -309,13 +304,6 @@ ScreenManager:
                 md_bg_color: "#95a5a6"
                 on_press: root.clear_cart()
 
-        MDRaisedButton:
-            text: "导出Excel报价单"
-            md_bg_color: "#8e44ad"
-            size_hint:1, None
-            height: dp(45)
-            on_press: root.export_excel()
-
         MDTextButton:
             text: "返回查询页"
             on_press: app.root.current = "client"
@@ -362,7 +350,7 @@ class ClientScreen(Screen):
             )
             self.ids.table_box.add_widget(table)
         except Exception as e:
-            self.ids.tip_text.text = f"数据库错误: {str(e)}"
+            self.ids.tip_text.text = f"错误: {str(e)}"
 
 class AdminScreen(Screen):
     editing_id = None
@@ -386,7 +374,7 @@ class AdminScreen(Screen):
             self.ids.admin_table_box.add_widget(table)
             self.table = table
         except Exception as e:
-            self.show_msg(f"加载数据失败: {str(e)}")
+            self.show_msg(f"加载失败: {str(e)}")
 
     def save_data(self):
         p1 = self.ids.e1.text.strip()
@@ -452,45 +440,6 @@ class AdminScreen(Screen):
         self.ids.e2.text = ""
         self.ids.e3.text = ""
         self.ids.e4.text = ""
-
-    def import_excel(self):
-        # Android 上 filechooser 可能不支持，提示用户
-        if IS_ANDROID:
-            self.show_msg("Android 上导入功能暂不支持，请在电脑上操作")
-            return
-        def select_file(path):
-            if not path:
-                return
-            try:
-                wb = load_workbook(path)
-                ws = wb.active
-                headers = [cell.value for cell in next(ws.iter_rows(min_row=1, max_row=1))]
-                mapping = {}
-                for idx, h in enumerate(headers):
-                    if h in EXCEL_HEADERS:
-                        mapping[h] = idx
-                if len(mapping)!=4:
-                    self.show_msg("Excel格式错误！")
-                    return
-                cols = [mapping[h] for h in EXCEL_HEADERS]
-                conn = sqlite3.connect(DB_NAME)
-                c = conn.cursor()
-                cnt = 0
-                for row in ws.iter_rows(min_row=2, values_only=True):
-                    vals = [str(row[i]).strip() if row[i] else "" for i in cols]
-                    if all(vals):
-                        c.execute("INSERT INTO capabilities VALUES (NULL,?,?,?,?)", vals)
-                        cnt +=1
-                conn.commit()
-                conn.close()
-                self.load_list()
-                self.show_msg(f"成功导入{cnt}条数据")
-            except Exception as e:
-                self.show_msg(f"导入失败：{str(e)}")
-        try:
-            filechooser.open_file(on_selection=select_file)
-        except Exception as e:
-            self.show_msg(f"文件选择器错误: {str(e)}")
 
     def show_msg(self, txt):
         dialog = MDDialog(text=txt, buttons=[MDRaisedButton(text="确定", on_press=lambda x: dialog.dismiss())])
@@ -583,47 +532,20 @@ class QuoteScreen(Screen):
         self.cart_list.clear()
         self.refresh_cart()
 
-    def export_excel(self):
-        if IS_ANDROID:
-            self.show_msg("Android 上导出功能暂不支持，请在电脑上操作")
-            return
-        if not self.cart_list:
-            self.show_msg("报价单为空！")
-            return
-        def save_file(path):
-            if not path:
-                return
-            wb = Workbook()
-            ws = wb.active
-            ws.title = "报价单"
-            headers = ["检定项目","型号规格","测量范围","单价","数量","小计"]
-            ws.append(headers)
-            for item in self.cart_list:
-                ws.append([item["name"],item["model"],item["range"],item["price_str"],item["qty"],round(item["sub"],2)])
-            total = sum(i["sub"] for i in self.cart_list)
-            ws.append(["合计","","","","",round(total,2)])
-            wb.save(path)
-            self.show_msg("导出成功！")
-        try:
-            filechooser.save_file(on_selection=save_file)
-        except Exception as e:
-            self.show_msg(f"导出失败: {str(e)}")
-
     def show_msg(self,txt):
         dialog = MDDialog(text=txt, buttons=[MDRaisedButton(text="确定", on_press=lambda x: dialog.dismiss())])
         dialog.open()
 
-# ==================== 注册页面 ====================
+# ==================== 主应用 ====================
 class SM(ScreenManager):
     pass
 
 class PriceApp(MDApp):
     def build(self):
+        print("=== APP 启动 ===")
         self.theme_cls.primary_palette = "Blue"
         self.theme_cls.theme_style = "Light"
-        # 初始化数据库
-        if not init_db():
-            print("数据库初始化失败，但应用将继续运行")
+        init_db()
         return Builder.load_string(KV)
 
 if __name__ == "__main__":
