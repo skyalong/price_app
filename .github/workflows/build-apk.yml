@@ -29,14 +29,14 @@ jobs:
           rm -rf /home/user/.venv
           # 使用 Python 3.11 创建新的虚拟环境
           python3 -m venv /home/user/.venv
-          # 激活虚拟环境并安装 Buildozer
-          source /home/user/.venv/bin/activate
+          # 激活虚拟环境并安装 Buildozer（使用 . 代替 source）
+          . /home/user/.venv/bin/activate
           pip install --upgrade pip
           pip install buildozer cython
 
       - name: Build APK
         run: |
-          source /home/user/.venv/bin/activate
+          . /home/user/.venv/bin/activate
           yes | buildozer -v android debug
 
       - name: Upload APK
