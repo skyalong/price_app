@@ -8,51 +8,46 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    container:
+      image: kivy/buildozer:latest
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.9'
-
-      - name: Install system dependencies
+      - name: Install Python 3.11
         run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            git zip unzip \
-            openjdk-17-jdk \
-            python3-pip \
-            autoconf libtool pkg-config \
-            zlib1g-dev libncurses5-dev libncursesw5-dev \
-            cmake libffi-dev libssl-dev
-
-      - name: Install Buildozer
-        run: |
+          apt-get update
+          apt-get install -y software-properties-common
+          add-apt-repository ppa:deadsnakes/ppa -y
+          apt-get update
+          apt-get install -y python3.11 python3.11-dev python3.11-venv python3-pip
+          update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1
+          update-alternatives --set python3 /usr/bin/python3.11
+          rm -rf /home/user/.venv
+          python3 -m venv /home/user/.venv
+          . /home/user/.venv/bin/activate
           pip install --upgrade pip
-          pip install cython buildozer
+          pip install buildozer cython
 
-      # 🔑 关键步骤：先接受许可证，再安装指定版本的 Build Tools
-      - name: Accept licenses and install Build Tools 34
+      # 🔑 先运行一次 Buildozer 来下载 p4a（会失败但没关系）
+      - name: Initialize Buildozer and download p4a
         run: |
-          # 创建目录并接受所有许可证
-          mkdir -p ~/.android
-          echo "### User Sources for Android SDK Manager" > ~/.android/repositories.cfg
-          
-          # 先运行一次 buildozer 来初始化 SDK
-          buildozer android debug || true
-          
-          # 接受所有许可证
-          yes | ~/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager --licenses || true
-          
-          # 安装指定版本的 Build Tools
-          ~/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager --sdk_root=/home/runner/.buildozer/android/platform/android-sdk "build-tools;34.0.0"
+          . /home/user/.venv/bin/activate
+          yes | buildozer android debug || true
+
+      # 🔑 现在 p4a 已经下载，修改 hostpython3 版本
+      - name: Fix p4a Python version
+        run: |
+          sed -i 's/version = "3.14.2"/version = "3.11.9"/g' /__w/price_app/price_app/.buildozer/android/platform/python-for-android/pythonforandroid/recipes/hostpython3/__init__.py || true
+          sed -i 's/version = "3.14.2"/version = "3.11.9"/g' /__w/price_app/price_app/.buildozer/android/platform/python-for-android/pythonforandroid/recipes/python3/__init__.py || true
+          # 清理构建目录，让 Buildozer 重新开始
+          rm -rf /__w/price_app/price_app/.buildozer/android/platform/build-arm64-v8a_armeabi-v7a
 
       - name: Build APK
         run: |
-          buildozer -v android debug
+          . /home/user/.venv/bin/activate
+          yes | buildozer -v android debug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
