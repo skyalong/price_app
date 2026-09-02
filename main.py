@@ -1,4 +1,3 @@
-
 # -*- coding: utf-8 -*-
 from kivy.lang import Builder
 from kivy.core.window import Window
@@ -19,32 +18,55 @@ import re
 import os
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
-from plyer import filechooser
+
+# ==================== Android 兼容处理 ====================
+# 判断是否在 Android 上运行
+IS_ANDROID = False
+try:
+    from android.permissions import request_permissions, Permission
+    IS_ANDROID = True
+except ImportError:
+    pass
+
+# 获取正确的数据库路径
+def get_db_path():
+    if IS_ANDROID:
+        # Android 上使用应用私有目录
+        from android.storage import app_storage_path
+        return os.path.join(app_storage_path(), "business.db")
+    else:
+        return "business.db"
 
 # ==================== 全局配置 ====================
 ADMIN_PASSWORD = "432"
 EXCEL_HEADERS = ["检定项目", "型号规格", "测量范围", "价格"]
-DB_NAME = "business.db"
+DB_NAME = get_db_path()
 
-# 窗口适配
-Window.size = (360, 640)
+# 只在非 Android 环境下设置窗口大小
+if not IS_ANDROID:
+    Window.size = (360, 640)
 Window.clearcolor = get_color_from_hex("#f5f5f5")
 
 # ==================== 数据库初始化 ====================
 def init_db():
-    conn = sqlite3.connect(DB_NAME)
-    c = conn.cursor()
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS capabilities (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            project_name TEXT NOT NULL,
-            model_spec TEXT NOT NULL,
-            measure_range TEXT NOT NULL,
-            price TEXT NOT NULL
-        )
-    """)
-    conn.commit()
-    conn.close()
+    try:
+        conn = sqlite3.connect(DB_NAME)
+        c = conn.cursor()
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS capabilities (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_name TEXT NOT NULL,
+                model_spec TEXT NOT NULL,
+                measure_range TEXT NOT NULL,
+                price TEXT NOT NULL
+            )
+        """)
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"数据库初始化失败: {e}")
+        return False
 
 def parse_price(price_str):
     nums = re.findall(r'\d+\.?\d*', str(price_str))
@@ -318,25 +340,28 @@ class ClientScreen(Screen):
     def search_data(self):
         key = self.ids.search_key.text.strip()
         self.ids.table_box.clear_widgets()
-        conn = sqlite3.connect(DB_NAME)
-        c = conn.cursor()
-        if key:
-            c.execute("SELECT project_name,model_spec,measure_range,price FROM capabilities WHERE project_name LIKE ?", (f"%{key}%",))
-        else:
-            c.execute("SELECT project_name,model_spec,measure_range,price FROM capabilities")
-        res = c.fetchall()
-        conn.close()
-        if not res:
-            self.ids.tip_text.text = "暂不开展此项业务"
-            return
-        self.ids.tip_text.text = ""
-        table = MDDataTable(
-            size_hint=(1, None),
-            height=dp(400),
-            column_data=[("项目", dp(90)), ("型号", dp(90)), ("范围", dp(90)), ("价格", dp(70))],
-            row_data=[(i[0],i[1],i[2],i[3]) for i in res]
-        )
-        self.ids.table_box.add_widget(table)
+        try:
+            conn = sqlite3.connect(DB_NAME)
+            c = conn.cursor()
+            if key:
+                c.execute("SELECT project_name,model_spec,measure_range,price FROM capabilities WHERE project_name LIKE ?", (f"%{key}%",))
+            else:
+                c.execute("SELECT project_name,model_spec,measure_range,price FROM capabilities")
+            res = c.fetchall()
+            conn.close()
+            if not res:
+                self.ids.tip_text.text = "暂不开展此项业务"
+                return
+            self.ids.tip_text.text = ""
+            table = MDDataTable(
+                size_hint=(1, None),
+                height=dp(400),
+                column_data=[("项目", dp(90)), ("型号", dp(90)), ("范围", dp(90)), ("价格", dp(70))],
+                row_data=[(i[0],i[1],i[2],i[3]) for i in res]
+            )
+            self.ids.table_box.add_widget(table)
+        except Exception as e:
+            self.ids.tip_text.text = f"数据库错误: {str(e)}"
 
 class AdminScreen(Screen):
     editing_id = None
@@ -345,19 +370,22 @@ class AdminScreen(Screen):
 
     def load_list(self):
         self.ids.admin_table_box.clear_widgets()
-        conn = sqlite3.connect(DB_NAME)
-        c = conn.cursor()
-        c.execute("SELECT id,project_name,model_spec,measure_range,price FROM capabilities")
-        res = c.fetchall()
-        conn.close()
-        table = MDDataTable(
-            size_hint=(1, None),
-            height=dp(350),
-            column_data=[("ID", dp(40)), ("项目", dp(80)), ("型号", dp(90)), ("范围", dp(90)), ("价格", dp(60))],
-            row_data=[(str(i[0]),i[1],i[2],i[3],i[4]) for i in res]
-        )
-        self.ids.admin_table_box.add_widget(table)
-        self.table = table
+        try:
+            conn = sqlite3.connect(DB_NAME)
+            c = conn.cursor()
+            c.execute("SELECT id,project_name,model_spec,measure_range,price FROM capabilities")
+            res = c.fetchall()
+            conn.close()
+            table = MDDataTable(
+                size_hint=(1, None),
+                height=dp(350),
+                column_data=[("ID", dp(40)), ("项目", dp(80)), ("型号", dp(90)), ("范围", dp(90)), ("价格", dp(60))],
+                row_data=[(str(i[0]),i[1],i[2],i[3],i[4]) for i in res]
+            )
+            self.ids.admin_table_box.add_widget(table)
+            self.table = table
+        except Exception as e:
+            self.show_msg(f"加载数据失败: {str(e)}")
 
     def save_data(self):
         p1 = self.ids.e1.text.strip()
@@ -367,21 +395,27 @@ class AdminScreen(Screen):
         if not all([p1,p2,p3,p4]):
             self.show_msg("所有字段不能为空！")
             return
-        conn = sqlite3.connect(DB_NAME)
-        c = conn.cursor()
-        if self.editing_id:
-            c.execute("UPDATE capabilities SET project_name=?,model_spec=?,measure_range=?,price=? WHERE id=?",(p1,p2,p3,p4,self.editing_id))
-            self.editing_id = None
-            self.ids.edit_tip.text = ""
-        else:
-            c.execute("INSERT INTO capabilities(project_name,model_spec,measure_range,price) VALUES (?,?,?,?)",(p1,p2,p3,p4))
-        conn.commit()
-        conn.close()
-        self.clear_input()
-        self.load_list()
-        self.show_msg("保存成功！")
+        try:
+            conn = sqlite3.connect(DB_NAME)
+            c = conn.cursor()
+            if self.editing_id:
+                c.execute("UPDATE capabilities SET project_name=?,model_spec=?,measure_range=?,price=? WHERE id=?",(p1,p2,p3,p4,self.editing_id))
+                self.editing_id = None
+                self.ids.edit_tip.text = ""
+            else:
+                c.execute("INSERT INTO capabilities(project_name,model_spec,measure_range,price) VALUES (?,?,?,?)",(p1,p2,p3,p4))
+            conn.commit()
+            conn.close()
+            self.clear_input()
+            self.load_list()
+            self.show_msg("保存成功！")
+        except Exception as e:
+            self.show_msg(f"保存失败: {str(e)}")
 
     def edit_data(self):
+        if not hasattr(self, 'table') or self.table is None:
+            self.show_msg("请先加载数据！")
+            return
         row = self.table.current_row
         if not row:
             self.show_msg("请选择一行数据！")
@@ -394,17 +428,23 @@ class AdminScreen(Screen):
         self.ids.edit_tip.text = f"正在修改ID:{self.editing_id}"
 
     def del_data(self):
+        if not hasattr(self, 'table') or self.table is None:
+            self.show_msg("请先加载数据！")
+            return
         row = self.table.current_row
         if not row:
             self.show_msg("请选择一行！")
             return
-        conn = sqlite3.connect(DB_NAME)
-        c = conn.cursor()
-        c.execute("DELETE FROM capabilities WHERE id=?",(int(row[0]),))
-        conn.commit()
-        conn.close()
-        self.load_list()
-        self.show_msg("删除成功！")
+        try:
+            conn = sqlite3.connect(DB_NAME)
+            c = conn.cursor()
+            c.execute("DELETE FROM capabilities WHERE id=?",(int(row[0]),))
+            conn.commit()
+            conn.close()
+            self.load_list()
+            self.show_msg("删除成功！")
+        except Exception as e:
+            self.show_msg(f"删除失败: {str(e)}")
 
     def clear_input(self):
         self.ids.e1.text = ""
@@ -413,6 +453,10 @@ class AdminScreen(Screen):
         self.ids.e4.text = ""
 
     def import_excel(self):
+        # Android 上 filechooser 可能不支持，提示用户
+        if IS_ANDROID:
+            self.show_msg("Android 上导入功能暂不支持，请在电脑上操作")
+            return
         def select_file(path):
             if not path:
                 return
@@ -442,7 +486,10 @@ class AdminScreen(Screen):
                 self.show_msg(f"成功导入{cnt}条数据")
             except Exception as e:
                 self.show_msg(f"导入失败：{str(e)}")
-        filechooser.open_file(on_selection=select_file)
+        try:
+            filechooser.open_file(on_selection=select_file)
+        except Exception as e:
+            self.show_msg(f"文件选择器错误: {str(e)}")
 
     def show_msg(self, txt):
         dialog = MDDialog(text=txt, buttons=[MDRaisedButton(text="确定", on_press=lambda x: dialog.dismiss())])
@@ -457,24 +504,30 @@ class QuoteScreen(Screen):
     def q_search(self):
         key = self.ids.q_search.text.strip()
         self.ids.q_table_box.clear_widgets()
-        conn = sqlite3.connect(DB_NAME)
-        c = conn.cursor()
-        if key:
-            c.execute("SELECT project_name,model_spec,measure_range,price FROM capabilities WHERE project_name LIKE ?",(f"%{key}%",))
-        else:
-            c.execute("SELECT project_name,model_spec,measure_range,price FROM capabilities")
-        res = c.fetchall()
-        conn.close()
-        table = MDDataTable(
-            size_hint=(1, None),
-            height=dp(220),
-            column_data=[("项目",dp(80)),("型号",dp(80)),("范围",dp(80)),("价格",dp(60))],
-            row_data=res
-        )
-        self.ids.q_table_box.add_widget(table)
-        self.q_table = table
+        try:
+            conn = sqlite3.connect(DB_NAME)
+            c = conn.cursor()
+            if key:
+                c.execute("SELECT project_name,model_spec,measure_range,price FROM capabilities WHERE project_name LIKE ?",(f"%{key}%",))
+            else:
+                c.execute("SELECT project_name,model_spec,measure_range,price FROM capabilities")
+            res = c.fetchall()
+            conn.close()
+            table = MDDataTable(
+                size_hint=(1, None),
+                height=dp(220),
+                column_data=[("项目",dp(80)),("型号",dp(80)),("范围",dp(80)),("价格",dp(60))],
+                row_data=res
+            )
+            self.ids.q_table_box.add_widget(table)
+            self.q_table = table
+        except Exception as e:
+            self.show_msg(f"查询失败: {str(e)}")
 
     def add_cart(self):
+        if not hasattr(self, 'q_table') or self.q_table is None:
+            self.show_msg("请先搜索数据！")
+            return
         row = self.q_table.current_row
         if not row:
             self.show_msg("请选择项目！")
@@ -514,6 +567,9 @@ class QuoteScreen(Screen):
         self.cart_table = table
 
     def del_cart(self):
+        if not hasattr(self, 'cart_table') or self.cart_table is None:
+            self.show_msg("报价单为空！")
+            return
         row = self.cart_table.current_row
         if not row:
             self.show_msg("请选择！")
@@ -527,6 +583,9 @@ class QuoteScreen(Screen):
         self.refresh_cart()
 
     def export_excel(self):
+        if IS_ANDROID:
+            self.show_msg("Android 上导出功能暂不支持，请在电脑上操作")
+            return
         if not self.cart_list:
             self.show_msg("报价单为空！")
             return
@@ -544,7 +603,10 @@ class QuoteScreen(Screen):
             ws.append(["合计","","","","",round(total,2)])
             wb.save(path)
             self.show_msg("导出成功！")
-        filechooser.save_file(on_selection=save_file)
+        try:
+            filechooser.save_file(on_selection=save_file)
+        except Exception as e:
+            self.show_msg(f"导出失败: {str(e)}")
 
     def show_msg(self,txt):
         dialog = MDDialog(text=txt, buttons=[MDRaisedButton(text="确定", on_press=lambda x: dialog.dismiss())])
@@ -558,7 +620,9 @@ class PriceApp(MDApp):
     def build(self):
         self.theme_cls.primary_palette = "Blue"
         self.theme_cls.theme_style = "Light"
-        init_db()
+        # 初始化数据库
+        if not init_db():
+            print("数据库初始化失败，但应用将继续运行")
         return Builder.load_string(KV)
 
 if __name__ == "__main__":
