@@ -15,7 +15,7 @@ android.api = 33
 android.ndk = 25c
 android.sdk = 33
 android.minapi = 21
-android.build_tools = 33.0.0
+#android.build_tools = 33.0.0
 
 android.enable_androidx = True
 fullscreen = 0
