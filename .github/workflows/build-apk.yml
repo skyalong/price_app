@@ -8,54 +8,12 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    container:
+      image: kivy/buildozer:latest
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.9'
-
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            git zip unzip \
-            openjdk-17-jdk \
-            python3-pip \
-            autoconf libtool pkg-config \
-            zlib1g-dev libncurses5-dev libncursesw5-dev \
-            cmake libffi-dev libssl-dev
-
-      - name: Install Buildozer
-        run: |
-          pip install --upgrade pip
-          pip install cython buildozer
-
-      # 🔑 关键：在 Buildozer 运行之前手动安装 SDK
-      - name: Setup Android SDK manually
-        run: |
-          # 创建目录
-          mkdir -p ~/.buildozer/android/platform/android-sdk
-          mkdir -p ~/.android
-          echo "### User Sources for Android SDK Manager" > ~/.android/repositories.cfg
-          
-          # 下载 command line tools
-          cd ~/.buildozer/android/platform/android-sdk
-          wget -q https://dl.google.com/android/repository/commandlinetools-linux-6514223_latest.zip
-          unzip -q commandlinetools-linux-6514223_latest.zip
-          rm commandlinetools-linux-6514223_latest.zip
-          
-          # 接受所有许可证
-          yes | ~/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager --licenses || true
-          
-          # 安装所需的 Build Tools、Platform Tools 和 Platform
-          ~/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager --sdk_root=/home/runner/.buildozer/android/platform/android-sdk \
-            "build-tools;34.0.0" \
-            "platform-tools" \
-            "platforms;android-33"
 
       - name: Build APK
         run: |
