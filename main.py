@@ -197,7 +197,7 @@ ScreenManager:
         MDLabel:
             id: edit_tip
             text: ""
-            theme_text_color: "Warning"
+            theme_text_color: "Error"
 
         MDBoxLayout:
             spacing: dp(5)
