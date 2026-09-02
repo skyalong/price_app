@@ -8,8 +8,8 @@ source.include_exts = py,png,jpg,kv,atlas
 
 version = 1.0.0
 
-requirements = python3,kivy==2.3.0,kivymd==1.1.1,plyer,openpyxl
-
+#requirements = python3,kivy==2.3.0,kivymd==1.1.1,plyer,openpyxl
+requirements = python3==3.11.9,kivy==2.3.0,kivymd==1.1.1,plyer,openpyxl
 android.permissions = INTERNET,READ_EXTERNAL_STORAGE,WRITE_EXTERNAL_STORAGE
 android.api = 33
 android.ndk = 25c
