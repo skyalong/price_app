@@ -34,21 +34,21 @@ jobs:
           pip install --upgrade pip
           pip install cython buildozer
 
-      # 🔑 关键步骤：先接受许可证，再安装指定版本的 Build Tools
-      - name: Accept licenses and install Build Tools 34
+      # 🔑 关键：先手动初始化 SDK 并接受许可证
+      - name: Initialize Android SDK and accept licenses
         run: |
-          # 创建目录并接受所有许可证
+          # 创建必要的目录
           mkdir -p ~/.android
           echo "### User Sources for Android SDK Manager" > ~/.android/repositories.cfg
           
-          # 先运行一次 buildozer 来初始化 SDK
+          # 让 Buildozer 先下载 SDK（但会在许可证处卡住，没关系）
           buildozer android debug || true
           
-          # 接受所有许可证
+          # 现在 SDK 已经下载好了，手动接受所有许可证
           yes | ~/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager --licenses || true
           
-          # 安装指定版本的 Build Tools
-          ~/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager --sdk_root=/home/runner/.buildozer/android/platform/android-sdk "build-tools;34.0.0"
+          # 手动安装需要的 Build Tools
+          ~/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager --sdk_root=/home/runner/.buildozer/android/platform/android-sdk "build-tools;34.0.0" "platform-tools" "platforms;android-33"
 
       - name: Build APK
         run: |
