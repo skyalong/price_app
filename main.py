@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 标准仪器维检部检校业务价格查询系统 - Android版
-基于 Kivy/KivyMD 框架
+修复闪退问题
 """
 
 from kivy.lang import Builder
@@ -10,12 +10,9 @@ from kivy.utils import get_color_from_hex
 from kivy.metrics import dp
 from kivy.uix.screenmanager import ScreenManager, Screen
 from kivy.uix.boxlayout import BoxLayout
-from kivy.uix.scrollview import ScrollView
 from kivy.uix.label import Label
 from kivy.uix.button import Button
-from kivy.uix.textinput import TextInput
 from kivy.uix.popup import Popup
-from kivy.uix.gridlayout import GridLayout
 from kivy.clock import Clock
 from kivymd.app import MDApp
 from kivymd.uix.dialog import MDDialog
@@ -31,28 +28,52 @@ from kivymd.uix.snackbar import Snackbar
 import sqlite3
 import re
 import os
-import shutil
-from openpyxl import load_workbook, Workbook
-from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
-from android.permissions import request_permissions, Permission
-from android.storage import app_storage_path, primary_external_storage_path
+import sys
+import traceback
 
-# 请求权限
-request_permissions([
-    Permission.READ_EXTERNAL_STORAGE,
-    Permission.WRITE_EXTERNAL_STORAGE,
-    Permission.MANAGE_EXTERNAL_STORAGE
-])
+# ==================== 错误日志记录 ====================
+def log_error(msg):
+    """记录错误到文件，便于调试"""
+    try:
+        from android.storage import app_storage_path
+        log_path = os.path.join(app_storage_path(), 'error_log.txt')
+    except:
+        log_path = 'error_log.txt'
+    
+    with open(log_path, 'a', encoding='utf-8') as f:
+        f.write(f"{msg}\n")
+        f.write("=" * 50 + "\n")
+
+# ==================== Android 权限 ====================
+def request_permissions_safe():
+    """安全地请求权限"""
+    try:
+        from android.permissions import request_permissions, Permission
+        request_permissions([
+            Permission.READ_EXTERNAL_STORAGE,
+            Permission.WRITE_EXTERNAL_STORAGE,
+        ])
+        return True
+    except Exception as e:
+        log_error(f"权限申请失败: {e}")
+        return False
 
 # ==================== 路径配置 ====================
 def get_db_path():
-    """获取应用私有目录下的数据库路径"""
+    """获取应用私有目录下的数据库路径 - 修复版本"""
     try:
-        path = os.path.join(app_storage_path(), 'business.db')
-        print(f"数据库路径: {path}")
+        from android.storage import app_storage_path
+        # 确保目录存在
+        storage_path = app_storage_path()
+        if not os.path.exists(storage_path):
+            os.makedirs(storage_path, exist_ok=True)
+        path = os.path.join(storage_path, 'business.db')
+        log_error(f"数据库路径: {path}")
         return path
-    except:
-        return 'business.db'
+    except Exception as e:
+        log_error(f"获取存储路径失败: {e}")
+        # 使用当前目录作为备选
+        return os.path.join(os.getcwd(), 'business.db')
 
 DB_NAME = get_db_path()
 ADMIN_PASSWORD = "432"
@@ -61,15 +82,26 @@ EXCEL_HEADERS = ["检定项目", "型号规格", "测量范围", "价格"]
 # ==================== 解析函数 ====================
 def parse_price(price_str):
     """从价格字符串中提取数字"""
-    nums = re.findall(r'\d+\.?\d*', str(price_str))
-    if nums:
-        return float(nums[0])
+    try:
+        nums = re.findall(r'\d+\.?\d*', str(price_str))
+        if nums:
+            return float(nums[0])
+    except:
+        pass
     return 0.0
 
 # ==================== 数据库初始化 ====================
 def init_db():
-    """初始化数据库"""
+    """初始化数据库 - 带错误处理"""
     try:
+        log_error(f"开始初始化数据库: {DB_NAME}")
+        
+        # 确保目录存在
+        db_dir = os.path.dirname(DB_NAME)
+        if db_dir and not os.path.exists(db_dir):
+            os.makedirs(db_dir, exist_ok=True)
+            log_error(f"创建数据库目录: {db_dir}")
+
         conn = sqlite3.connect(DB_NAME)
         c = conn.cursor()
         c.execute("""
@@ -83,10 +115,10 @@ def init_db():
         """)
         conn.commit()
         conn.close()
-        print("数据库初始化成功")
+        log_error("数据库初始化成功")
         return True
     except Exception as e:
-        print(f"数据库初始化失败: {e}")
+        log_error(f"数据库初始化失败: {traceback.format_exc()}")
         return False
 
 # ==================== KV 字符串 ====================
@@ -390,35 +422,39 @@ ScreenManager:
 class MainScreen(Screen):
     def show_admin_login(self):
         """显示管理员登录对话框"""
-        content = MDBoxLayout(
-            orientation="vertical",
-            spacing=dp(10),
-            padding=dp(10),
-            size_hint_y=None,
-            height=dp(150)
-        )
-        content.add_widget(MDLabel(text="请输入管理员密码："))
-        pwd_input = MDTextField(
-            hint_text="密码",
-            password=True,
-            size_hint_y=None,
-            height=dp(50)
-        )
-        content.add_widget(pwd_input)
+        try:
+            content = MDBoxLayout(
+                orientation="vertical",
+                spacing=dp(10),
+                padding=dp(10),
+                size_hint_y=None,
+                height=dp(150)
+            )
+            content.add_widget(MDLabel(text="请输入管理员密码："))
+            pwd_input = MDTextField(
+                hint_text="密码",
+                password=True,
+                size_hint_y=None,
+                height=dp(50)
+            )
+            content.add_widget(pwd_input)
 
-        dialog = MDDialog(
-            title="管理员验证",
-            type="custom",
-            content_cls=content,
-            buttons=[
-                MDFlatButton(text="取消", on_press=lambda x: dialog.dismiss()),
-                MDRaisedButton(
-                    text="确定",
-                    on_press=lambda x: self.check_password(pwd_input.text, dialog)
-                )
-            ]
-        )
-        dialog.open()
+            dialog = MDDialog(
+                title="管理员验证",
+                type="custom",
+                content_cls=content,
+                buttons=[
+                    MDFlatButton(text="取消", on_press=lambda x: dialog.dismiss()),
+                    MDRaisedButton(
+                        text="确定",
+                        on_press=lambda x: self.check_password(pwd_input.text, dialog)
+                    )
+                ]
+            )
+            dialog.open()
+        except Exception as e:
+            log_error(f"显示登录对话框失败: {traceback.format_exc()}")
+            Snackbar(text=f"错误: {str(e)}", duration=3).open()
 
     def check_password(self, pwd, dialog):
         if pwd == ADMIN_PASSWORD:
@@ -430,14 +466,18 @@ class MainScreen(Screen):
 
 class ClientScreen(Screen):
     def on_enter(self):
-        self.search_data()
+        try:
+            self.search_data()
+        except Exception as e:
+            log_error(f"ClientScreen.on_enter 错误: {traceback.format_exc()}")
+            self.ids.tip_text.text = f"加载失败: {str(e)}"
 
     def search_data(self):
-        key = self.ids.search_key.text.strip()
-        self.ids.table_box.clear_widgets()
-        self.ids.tip_text.text = ""
-
         try:
+            key = self.ids.search_key.text.strip()
+            self.ids.table_box.clear_widgets()
+            self.ids.tip_text.text = ""
+
             conn = sqlite3.connect(DB_NAME)
             c = conn.cursor()
             if key:
@@ -454,7 +494,6 @@ class ClientScreen(Screen):
                 self.ids.tip_text.text = "暂不开展此项业务"
                 return
 
-            # 创建数据表
             table = MDDataTable(
                 size_hint=(1, None),
                 height=dp(len(res) * 45 + 50),
@@ -470,6 +509,7 @@ class ClientScreen(Screen):
             self.ids.table_box.add_widget(table)
 
         except Exception as e:
+            log_error(f"search_data 错误: {traceback.format_exc()}")
             self.ids.tip_text.text = f"查询错误: {str(e)}"
 
 
@@ -478,11 +518,15 @@ class AdminScreen(Screen):
     table = None
 
     def on_enter(self):
-        self.load_list()
+        try:
+            self.load_list()
+        except Exception as e:
+            log_error(f"AdminScreen.on_enter 错误: {traceback.format_exc()}")
+            Snackbar(text=f"加载失败: {str(e)}", duration=3).open()
 
     def load_list(self):
-        self.ids.admin_table_box.clear_widgets()
         try:
+            self.ids.admin_table_box.clear_widgets()
             conn = sqlite3.connect(DB_NAME)
             c = conn.cursor()
             c.execute("SELECT id, project_name, model_spec, measure_range, price FROM capabilities ORDER BY id ASC")
@@ -513,14 +557,13 @@ class AdminScreen(Screen):
             self.table = table
 
         except Exception as e:
+            log_error(f"load_list 错误: {traceback.format_exc()}")
             Snackbar(text=f"加载失败: {str(e)}", duration=3).open()
 
     def on_row_select(self, instance_table, instance_row):
-        """点击行时选中"""
         pass
 
     def get_selected_row(self):
-        """获取选中的行数据"""
         if self.table is None:
             return None
         if hasattr(self.table, 'current_row') and self.table.current_row:
@@ -528,16 +571,16 @@ class AdminScreen(Screen):
         return None
 
     def save_data(self):
-        p1 = self.ids.e1.text.strip()
-        p2 = self.ids.e2.text.strip()
-        p3 = self.ids.e3.text.strip()
-        p4 = self.ids.e4.text.strip()
-
-        if not all([p1, p2, p3, p4]):
-            Snackbar(text="所有字段不能为空！", duration=2).open()
-            return
-
         try:
+            p1 = self.ids.e1.text.strip()
+            p2 = self.ids.e2.text.strip()
+            p3 = self.ids.e3.text.strip()
+            p4 = self.ids.e4.text.strip()
+
+            if not all([p1, p2, p3, p4]):
+                Snackbar(text="所有字段不能为空！", duration=2).open()
+                return
+
             conn = sqlite3.connect(DB_NAME)
             c = conn.cursor()
             if self.editing_id:
@@ -562,41 +605,49 @@ class AdminScreen(Screen):
             Snackbar(text=msg, duration=2).open()
 
         except Exception as e:
+            log_error(f"save_data 错误: {traceback.format_exc()}")
             Snackbar(text=f"保存失败: {str(e)}", duration=3).open()
 
     def edit_data(self):
-        row = self.get_selected_row()
-        if not row:
-            Snackbar(text="请选择一行数据！", duration=2).open()
-            return
+        try:
+            row = self.get_selected_row()
+            if not row:
+                Snackbar(text="请选择一行数据！", duration=2).open()
+                return
 
-        self.editing_id = int(row[0])
-        self.ids.e1.text = row[1]
-        self.ids.e2.text = row[2]
-        self.ids.e3.text = row[3]
-        self.ids.e4.text = row[4]
-        self.ids.edit_tip.text = f"正在修改 ID: {self.editing_id}"
+            self.editing_id = int(row[0])
+            self.ids.e1.text = row[1]
+            self.ids.e2.text = row[2]
+            self.ids.e3.text = row[3]
+            self.ids.e4.text = row[4]
+            self.ids.edit_tip.text = f"正在修改 ID: {self.editing_id}"
+        except Exception as e:
+            log_error(f"edit_data 错误: {traceback.format_exc()}")
+            Snackbar(text=f"操作失败: {str(e)}", duration=3).open()
 
     def del_data(self):
-        row = self.get_selected_row()
-        if not row:
-            Snackbar(text="请选择一行数据！", duration=2).open()
-            return
+        try:
+            row = self.get_selected_row()
+            if not row:
+                Snackbar(text="请选择一行数据！", duration=2).open()
+                return
 
-        # 显示确认对话框
-        dialog = MDDialog(
-            title="确认删除",
-            text=f"确定要删除 ID={row[0]} 的记录吗？",
-            buttons=[
-                MDFlatButton(text="取消", on_press=lambda x: dialog.dismiss()),
-                MDRaisedButton(
-                    text="确定删除",
-                    md_bg_color="#e74c3c",
-                    on_press=lambda x: self.confirm_delete(row[0], dialog)
-                )
-            ]
-        )
-        dialog.open()
+            dialog = MDDialog(
+                title="确认删除",
+                text=f"确定要删除 ID={row[0]} 的记录吗？",
+                buttons=[
+                    MDFlatButton(text="取消", on_press=lambda x: dialog.dismiss()),
+                    MDRaisedButton(
+                        text="确定删除",
+                        md_bg_color="#e74c3c",
+                        on_press=lambda x: self.confirm_delete(row[0], dialog)
+                    )
+                ]
+            )
+            dialog.open()
+        except Exception as e:
+            log_error(f"del_data 错误: {traceback.format_exc()}")
+            Snackbar(text=f"操作失败: {str(e)}", duration=3).open()
 
     def confirm_delete(self, rid, dialog):
         try:
@@ -616,6 +667,7 @@ class AdminScreen(Screen):
             Snackbar(text="删除成功！", duration=2).open()
 
         except Exception as e:
+            log_error(f"confirm_delete 错误: {traceback.format_exc()}")
             Snackbar(text=f"删除失败: {str(e)}", duration=3).open()
 
     def clear_input(self):
@@ -625,56 +677,34 @@ class AdminScreen(Screen):
         self.ids.e4.text = ""
 
     def import_from_excel(self):
-        """导入Excel文件 - Android版使用文件选择器"""
-        from android.storage import primary_external_storage_path
-        from android.permissions import request_permissions, Permission
-        import android
-
-        # 使用Android文件选择器
+        """导入Excel文件"""
         try:
-            from jnius import autoclass
-            Intent = autoclass('android.content.Intent')
-            Activity = autoclass('org.kivy.android.PythonActivity')
-            Uri = autoclass('android.net.Uri')
-            DocumentsContract = autoclass('android.provider.DocumentsContract')
+            from kivy.uix.filechooser import FileChooserListView
+            from kivy.uix.popup import Popup
 
-            # 创建文件选择Intent
-            intent = Intent(Intent.ACTION_OPEN_DOCUMENT)
-            intent.addCategory(Intent.CATEGORY_OPENABLE)
-            intent.setType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+            content = BoxLayout(orientation='vertical')
+            filechooser = FileChooserListView(
+                path='/storage/emulated/0/Download/',
+                filters=['*.xlsx']
+            )
+            content.add_widget(filechooser)
 
-            # 启动选择器（这里简化处理，使用kivy文件选择器）
-            self.show_file_chooser()
+            btn_layout = BoxLayout(size_hint_y=None, height=dp(50))
+            cancel_btn = Button(text="取消", on_press=lambda x: popup.dismiss())
+            confirm_btn = Button(text="导入", on_press=lambda x: self.process_import(filechooser.selection, popup))
+            btn_layout.add_widget(cancel_btn)
+            btn_layout.add_widget(confirm_btn)
+            content.add_widget(btn_layout)
 
-        except:
-            # 如果无法使用Intent，使用简单的文件选择
-            self.show_file_chooser()
-
-    def show_file_chooser(self):
-        """显示文件选择对话框"""
-        from kivy.uix.filechooser import FileChooserListView
-        from kivy.uix.popup import Popup
-
-        content = BoxLayout(orientation='vertical')
-        filechooser = FileChooserListView(
-            path='/storage/emulated/0/Download/',
-            filters=['*.xlsx']
-        )
-        content.add_widget(filechooser)
-
-        btn_layout = BoxLayout(size_hint_y=None, height=dp(50))
-        cancel_btn = Button(text="取消", on_press=lambda x: popup.dismiss())
-        confirm_btn = Button(text="导入", on_press=lambda x: self.process_import(filechooser.selection, popup))
-        btn_layout.add_widget(cancel_btn)
-        btn_layout.add_widget(confirm_btn)
-        content.add_widget(btn_layout)
-
-        popup = Popup(
-            title="选择Excel文件",
-            content=content,
-            size_hint=(0.9, 0.8)
-        )
-        popup.open()
+            popup = Popup(
+                title="选择Excel文件",
+                content=content,
+                size_hint=(0.9, 0.8)
+            )
+            popup.open()
+        except Exception as e:
+            log_error(f"import_from_excel 错误: {traceback.format_exc()}")
+            Snackbar(text=f"无法打开文件选择器: {str(e)}", duration=3).open()
 
     def process_import(self, selection, popup):
         if not selection:
@@ -690,10 +720,8 @@ class AdminScreen(Screen):
             wb = load_workbook(file_path, data_only=True)
             ws = wb.active
 
-            # 读取表头
             headers = [cell.value for cell in next(ws.iter_rows(min_row=1, max_row=1))]
 
-            # 按列名匹配
             mapping = {}
             for idx, h in enumerate(headers):
                 if h in EXCEL_HEADERS:
@@ -731,6 +759,7 @@ class AdminScreen(Screen):
             Snackbar(text=msg, duration=4).open()
 
         except Exception as e:
+            log_error(f"do_import 错误: {traceback.format_exc()}")
             Snackbar(text=f"导入失败: {str(e)}", duration=3).open()
 
 
@@ -740,14 +769,18 @@ class QuoteScreen(Screen):
     cart_table = None
 
     def on_enter(self):
-        self.q_search()
-        self.refresh_cart()
+        try:
+            self.q_search()
+            self.refresh_cart()
+        except Exception as e:
+            log_error(f"QuoteScreen.on_enter 错误: {traceback.format_exc()}")
+            Snackbar(text=f"加载失败: {str(e)}", duration=3).open()
 
     def q_search(self):
-        key = self.ids.q_search.text.strip()
-        self.ids.q_table_box.clear_widgets()
-
         try:
+            key = self.ids.q_search.text.strip()
+            self.ids.q_table_box.clear_widgets()
+
             conn = sqlite3.connect(DB_NAME)
             c = conn.cursor()
             if key:
@@ -781,10 +814,10 @@ class QuoteScreen(Screen):
             self.q_table = table
 
         except Exception as e:
+            log_error(f"q_search 错误: {traceback.format_exc()}")
             Snackbar(text=f"查询失败: {str(e)}", duration=2).open()
 
     def get_selected_quote_row(self):
-        """获取选中的查询结果行"""
         if self.q_table is None:
             return None
         if hasattr(self.q_table, 'current_row') and self.q_table.current_row:
@@ -792,74 +825,82 @@ class QuoteScreen(Screen):
         return None
 
     def add_cart(self):
-        row = self.get_selected_quote_row()
-        if not row:
-            Snackbar(text="请先搜索并选择项目！", duration=2).open()
-            return
-
         try:
-            qty = float(self.ids.qty_input.text.strip())
-            if qty <= 0:
-                raise ValueError
-        except:
-            Snackbar(text="数量必须是正数！", duration=2).open()
-            return
+            row = self.get_selected_quote_row()
+            if not row:
+                Snackbar(text="请先搜索并选择项目！", duration=2).open()
+                return
 
-        price_num = parse_price(row[3])
-        subtotal = price_num * qty
+            try:
+                qty = float(self.ids.qty_input.text.strip())
+                if qty <= 0:
+                    raise ValueError
+            except:
+                Snackbar(text="数量必须是正数！", duration=2).open()
+                return
 
-        self.cart_items.append({
-            "project_name": row[0],
-            "model_spec": row[1],
-            "measure_range": row[2],
-            "price_str": row[3],
-            "unit_price": price_num,
-            "quantity": qty,
-            "subtotal": subtotal
-        })
+            price_num = parse_price(row[3])
+            subtotal = price_num * qty
 
-        self.refresh_cart()
+            self.cart_items.append({
+                "project_name": row[0],
+                "model_spec": row[1],
+                "measure_range": row[2],
+                "price_str": row[3],
+                "unit_price": price_num,
+                "quantity": qty,
+                "subtotal": subtotal
+            })
+
+            self.refresh_cart()
+
+        except Exception as e:
+            log_error(f"add_cart 错误: {traceback.format_exc()}")
+            Snackbar(text=f"操作失败: {str(e)}", duration=3).open()
 
     def refresh_cart(self):
-        self.ids.cart_box.clear_widgets()
+        try:
+            self.ids.cart_box.clear_widgets()
 
-        if not self.cart_items:
-            self.ids.total_text.text = "总金额：0.00 元"
-            return
+            if not self.cart_items:
+                self.ids.total_text.text = "总金额：0.00 元"
+                return
 
-        rows = []
-        total = 0
-        for item in self.cart_items:
-            rows.append((
-                item["project_name"],
-                item["model_spec"],
-                item["measure_range"],
-                item["price_str"],
-                str(item["quantity"]),
-                f"{item['subtotal']:.2f}"
-            ))
-            total += item["subtotal"]
+            rows = []
+            total = 0
+            for item in self.cart_items:
+                rows.append((
+                    item["project_name"],
+                    item["model_spec"],
+                    item["measure_range"],
+                    item["price_str"],
+                    str(item["quantity"]),
+                    f"{item['subtotal']:.2f}"
+                ))
+                total += item["subtotal"]
 
-        table = MDDataTable(
-            size_hint=(1, None),
-            height=dp(len(rows) * 45 + 50),
-            column_data=[
-                ("项目", dp(80)),
-                ("型号", dp(80)),
-                ("范围", dp(80)),
-                ("单价", dp(50)),
-                ("数量", dp(40)),
-                ("小计", dp(60))
-            ],
-            row_data=rows,
-            check=False
-        )
-        self.ids.cart_box.add_widget(table)
-        self.cart_table = table
-        self.ids.total_text.text = f"总金额：{total:.2f} 元"
+            table = MDDataTable(
+                size_hint=(1, None),
+                height=dp(len(rows) * 45 + 50),
+                column_data=[
+                    ("项目", dp(80)),
+                    ("型号", dp(80)),
+                    ("范围", dp(80)),
+                    ("单价", dp(50)),
+                    ("数量", dp(40)),
+                    ("小计", dp(60))
+                ],
+                row_data=rows,
+                check=False
+            )
+            self.ids.cart_box.add_widget(table)
+            self.cart_table = table
+            self.ids.total_text.text = f"总金额：{total:.2f} 元"
+
+        except Exception as e:
+            log_error(f"refresh_cart 错误: {traceback.format_exc()}")
 
     def get_selected_cart_row(self):
-        """获取选中的报价单行"""
         if self.cart_table is None:
             return None
         if hasattr(self.cart_table, 'current_row') and self.cart_table.current_row:
@@ -867,18 +908,22 @@ class QuoteScreen(Screen):
         return None
 
     def del_cart(self):
-        row = self.get_selected_cart_row()
-        if not row:
-            Snackbar(text="请选择要删除的项目！", duration=2).open()
-            return
+        try:
+            row = self.get_selected_cart_row()
+            if not row:
+                Snackbar(text="请选择要删除的项目！", duration=2).open()
+                return
 
-        # 根据项目名称匹配删除
-        for i, item in enumerate(self.cart_items):
-            if item["project_name"] == row[0] and item["model_spec"] == row[1]:
-                del self.cart_items[i]
-                break
+            for i, item in enumerate(self.cart_items):
+                if item["project_name"] == row[0] and item["model_spec"] == row[1]:
+                    del self.cart_items[i]
+                    break
 
-        self.refresh_cart()
+            self.refresh_cart()
+
+        except Exception as e:
+            log_error(f"del_cart 错误: {traceback.format_exc()}")
+            Snackbar(text=f"操作失败: {str(e)}", duration=3).open()
 
     def clear_cart(self):
         if not self.cart_items:
@@ -905,21 +950,29 @@ class QuoteScreen(Screen):
         Snackbar(text="报价单已清空", duration=2).open()
 
     def export_quote_excel(self):
-        if not self.cart_items:
-            Snackbar(text="报价单为空！", duration=2).open()
-            return
-
-        # Android 环境下保存到下载目录
-        from android.storage import primary_external_storage_path
-        save_dir = os.path.join(primary_external_storage_path(), 'Download')
-        if not os.path.exists(save_dir):
-            save_dir = app_storage_path()
-
-        from datetime import datetime
-        filename = f"报价单_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-        file_path = os.path.join(save_dir, filename)
-
         try:
+            if not self.cart_items:
+                Snackbar(text="报价单为空！", duration=2).open()
+                return
+
+            # Android 环境下保存到下载目录
+            try:
+                from android.storage import primary_external_storage_path
+                save_dir = os.path.join(primary_external_storage_path(), 'Download')
+            except:
+                save_dir = '/storage/emulated/0/Download'
+
+            if not os.path.exists(save_dir):
+                try:
+                    from android.storage import app_storage_path
+                    save_dir = app_storage_path()
+                except:
+                    save_dir = os.getcwd()
+
+            from datetime import datetime
+            filename = f"报价单_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+            file_path = os.path.join(save_dir, filename)
+
             wb = Workbook()
             ws = wb.active
             ws.title = "报价单"
@@ -977,32 +1030,4 @@ class QuoteScreen(Screen):
             total_cell.alignment = Alignment(horizontal="center", vertical="center")
             total_cell.border = thin_border
 
-            # 调整列宽
-            ws.column_dimensions["A"].width = 22
-            ws.column_dimensions["B"].width = 22
-            ws.column_dimensions["C"].width = 22
-            ws.column_dimensions["D"].width = 12
-            ws.column_dimensions["E"].width = 10
-            ws.column_dimensions["F"].width = 12
-
-            wb.save(file_path)
-            Snackbar(text=f"报价单已保存到:\n{file_path}", duration=4).open()
-
-        except Exception as e:
-            Snackbar(text=f"导出失败: {str(e)}", duration=3).open()
-
-
-# ==================== 主应用 ====================
-class PriceApp(MDApp):
-    def build(self):
-        self.theme_cls.primary_palette = "Blue"
-        self.theme_cls.theme_style = "Light"
-
-        # 初始化数据库
-        init_db()
-
-        return Builder.load_string(KV)
-
-
-if __name__ == "__main__":
-    PriceApp().run()
+            # 调整
