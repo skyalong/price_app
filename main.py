@@ -1,57 +1,74 @@
 # -*- coding: utf-8 -*-
+"""
+标准仪器维检部检校业务价格查询系统 - Android版
+基于 Kivy/KivyMD 框架
+"""
+
 from kivy.lang import Builder
 from kivy.core.window import Window
 from kivy.utils import get_color_from_hex
 from kivy.metrics import dp
 from kivy.uix.screenmanager import ScreenManager, Screen
+from kivy.uix.boxlayout import BoxLayout
+from kivy.uix.scrollview import ScrollView
+from kivy.uix.label import Label
+from kivy.uix.button import Button
+from kivy.uix.textinput import TextInput
+from kivy.uix.popup import Popup
+from kivy.uix.gridlayout import GridLayout
+from kivy.clock import Clock
 from kivymd.app import MDApp
 from kivymd.uix.dialog import MDDialog
-from kivymd.uix.button import MDRaisedButton, MDTextButton
+from kivymd.uix.button import MDRaisedButton, MDTextButton, MDFlatButton
 from kivymd.uix.textfield import MDTextField
 from kivymd.uix.label import MDLabel
 from kivymd.uix.datatables import MDDataTable
 from kivymd.uix.boxlayout import MDBoxLayout
 from kivymd.uix.scrollview import MDScrollView
+from kivymd.uix.card import MDCard
+from kivymd.uix.toolbar import MDTopAppBar
+from kivymd.uix.snackbar import Snackbar
 import sqlite3
 import re
 import os
+import shutil
+from openpyxl import load_workbook, Workbook
+from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
+from android.permissions import request_permissions, Permission
+from android.storage import app_storage_path, primary_external_storage_path
 
-# ==================== 获取正确的数据库路径 ====================
+# 请求权限
+request_permissions([
+    Permission.READ_EXTERNAL_STORAGE,
+    Permission.WRITE_EXTERNAL_STORAGE,
+    Permission.MANAGE_EXTERNAL_STORAGE
+])
+
+# ==================== 路径配置 ====================
 def get_db_path():
     """获取应用私有目录下的数据库路径"""
     try:
-        from kivy.utils import platform
-        if platform == 'android':
-            try:
-                from android.storage import app_storage_path
-                path = os.path.join(app_storage_path(), 'business.db')
-                print(f"Android 数据库路径: {path}")
-                return path
-            except:
-                print("无法获取 Android 存储路径，使用默认")
-                return 'business.db'
-        else:
-            return 'business.db'
+        path = os.path.join(app_storage_path(), 'business.db')
+        print(f"数据库路径: {path}")
+        return path
     except:
         return 'business.db'
 
-# ==================== 全局配置 ====================
-ADMIN_PASSWORD = "432"
 DB_NAME = get_db_path()
-print(f"数据库路径: {DB_NAME}")
+ADMIN_PASSWORD = "432"
+EXCEL_HEADERS = ["检定项目", "型号规格", "测量范围", "价格"]
 
-# 只在非 Android 环境设置窗口大小
-try:
-    from kivy.utils import platform
-    if platform != 'android':
-        Window.size = (360, 640)
-except:
-    Window.size = (360, 640)
-
-Window.clearcolor = get_color_from_hex("#f5f5f5")
+# ==================== 解析函数 ====================
+def parse_price(price_str):
+    """从价格字符串中提取数字"""
+    nums = re.findall(r'\d+\.?\d*', str(price_str))
+    if nums:
+        return float(nums[0])
+    return 0.0
 
 # ==================== 数据库初始化 ====================
 def init_db():
+    """初始化数据库"""
     try:
         conn = sqlite3.connect(DB_NAME)
         c = conn.cursor()
@@ -72,53 +89,56 @@ def init_db():
         print(f"数据库初始化失败: {e}")
         return False
 
-def parse_price(price_str):
-    nums = re.findall(r'\d+\.?\d*', str(price_str))
-    if nums:
-        return float(nums[0])
-    return 0.0
-
 # ==================== KV 字符串 ====================
 KV = '''
 ScreenManager:
-    LoginScreen:
-    ClientScreen:
+    MainScreen:
     AdminScreen:
     QuoteScreen:
+    ClientScreen:
 
-<LoginScreen>:
-    name: "login"
+<MainScreen>:
+    name: "main"
     MDBoxLayout:
         orientation: "vertical"
-        spacing: dp(30)
-        padding: dp(30)
-        pos_hint: {"center_x":0.5, "center_y":0.5}
+        padding: dp(20)
+        spacing: dp(20)
+        pos_hint: {"center_x": 0.5, "center_y": 0.5}
 
         MDLabel:
-            text: "仪器检校价格系统"
+            text: "标准仪器维检部"
+            font_style: "H4"
+            halign: "center"
+            size_hint_y: None
+            height: dp(50)
+
+        MDLabel:
+            text: "检校业务价格查询系统"
             font_style: "H5"
             halign: "center"
-
-        MDTextField:
-            id: pwd_input
-            hint_text: "请输入管理员密码"
-            password: True
-            size_hint: 1, None
-            height: dp(50)
+            size_hint_y: None
+            height: dp(40)
 
         MDRaisedButton:
-            text: "进入管理后台"
-            md_bg_color: "#c0392b"
-            size_hint: 1, None
-            height: dp(50)
-            on_press: root.check_pwd()
-
-        MDRaisedButton:
-            text: "普通查询入口"
+            text: "单价查询"
             md_bg_color: "#2980b9"
             size_hint: 1, None
-            height: dp(50)
+            height: dp(60)
             on_press: app.root.current = "client"
+
+        MDRaisedButton:
+            text: "批量报价"
+            md_bg_color: "#8e44ad"
+            size_hint: 1, None
+            height: dp(60)
+            on_press: app.root.current = "quote"
+
+        MDRaisedButton:
+            text: "管理入口"
+            md_bg_color: "#c0392b"
+            size_hint: 1, None
+            height: dp(60)
+            on_press: root.show_admin_login()
 
 <ClientScreen>:
     name: "client"
@@ -127,15 +147,22 @@ ScreenManager:
         padding: dp(10)
         spacing: dp(10)
 
+        MDTopAppBar:
+            title: "单价查询"
+            left_action_items: [["arrow-left", lambda x: setattr(app.root, "current", "main")]]
+            elevation: 4
+
         MDBoxLayout:
             size_hint: 1, None
             height: dp(50)
             spacing: dp(10)
+            padding: dp(5)
 
             MDTextField:
                 id: search_key
                 hint_text: "输入检定项目搜索"
                 size_hint: 0.7, 1
+                on_text_validate: root.search_data()
 
             MDRaisedButton:
                 text: "查询"
@@ -147,24 +174,16 @@ ScreenManager:
             text: ""
             halign: "center"
             theme_text_color: "Error"
+            size_hint_y: None
+            height: dp(30)
 
         MDScrollView:
             size_hint: 1, 1
             MDBoxLayout:
                 id: table_box
                 size_hint: 1, None
-                height: dp(800)
-
-        MDRaisedButton:
-            text: "批量报价"
-            md_bg_color: "#8e44ad"
-            size_hint: 1, None
-            height: dp(45)
-            on_press: app.root.current = "quote"
-
-        MDTextButton:
-            text: "管理员入口"
-            on_press: app.root.current = "login"
+                height: dp(600)
+                orientation: "vertical"
 
 <AdminScreen>:
     name: "admin"
@@ -173,154 +192,241 @@ ScreenManager:
         padding: dp(10)
         spacing: dp(8)
 
-        MDTextField:
-            id: e1
-            hint_text: "检定项目"
-            size_hint: 1, None
-            height: dp(45)
-        MDTextField:
-            id: e2
-            hint_text: "型号规格"
-            size_hint: 1, None
-            height: dp(45)
-        MDTextField:
-            id: e3
-            hint_text: "测量范围"
-            size_hint: 1, None
-            height: dp(45)
-        MDTextField:
-            id: e4
-            hint_text: "价格"
-            size_hint: 1, None
-            height: dp(45)
-
-        MDLabel:
-            id: edit_tip
-            text: ""
-            theme_text_color: "Error"
-
-        MDBoxLayout:
-            spacing: dp(5)
-            size_hint: 1, None
-            height: dp(40)
-
-            MDRaisedButton:
-                text: "保存"
-                md_bg_color: "#27ae60"
-                on_press: root.save_data()
-            MDRaisedButton:
-                text: "修改"
-                md_bg_color: "#f39c12"
-                on_press: root.edit_data()
-            MDRaisedButton:
-                text: "删除"
-                md_bg_color: "#e74c3c"
-                on_press: root.del_data()
-
-        MDBoxLayout:
-            spacing: dp(5)
-            size_hint: 1, None
-            height: dp(40)
-
-            MDRaisedButton:
-                text: "刷新"
-                md_bg_color: "#3498db"
-                on_press: root.load_list()
+        MDTopAppBar:
+            title: "管理后台"
+            left_action_items: [["arrow-left", lambda x: setattr(app.root, "current", "main")]]
+            elevation: 4
 
         MDScrollView:
             size_hint: 1, 1
+            do_scroll_x: False
             MDBoxLayout:
-                id: admin_table_box
+                orientation: "vertical"
+                spacing: dp(8)
                 size_hint: 1, None
-                height: dp(600)
+                height: self.minimum_height
+
+                MDTextField:
+                    id: e1
+                    hint_text: "检定项目"
+                    size_hint: 1, None
+                    height: dp(45)
+                MDTextField:
+                    id: e2
+                    hint_text: "型号规格"
+                    size_hint: 1, None
+                    height: dp(45)
+                MDTextField:
+                    id: e3
+                    hint_text: "测量范围"
+                    size_hint: 1, None
+                    height: dp(45)
+                MDTextField:
+                    id: e4
+                    hint_text: "价格"
+                    size_hint: 1, None
+                    height: dp(45)
+
+                MDLabel:
+                    id: edit_tip
+                    text: ""
+                    theme_text_color: "Error"
+                    size_hint_y: None
+                    height: dp(30)
+
+                MDBoxLayout:
+                    spacing: dp(5)
+                    size_hint: 1, None
+                    height: dp(45)
+
+                    MDRaisedButton:
+                        text: "保存"
+                        md_bg_color: "#27ae60"
+                        on_press: root.save_data()
+                    MDRaisedButton:
+                        text: "修改"
+                        md_bg_color: "#f39c12"
+                        on_press: root.edit_data()
+                    MDRaisedButton:
+                        text: "删除"
+                        md_bg_color: "#e74c3c"
+                        on_press: root.del_data()
+
+                MDBoxLayout:
+                    spacing: dp(5)
+                    size_hint: 1, None
+                    height: dp(45)
+
+                    MDRaisedButton:
+                        text: "刷新列表"
+                        md_bg_color: "#3498db"
+                        on_press: root.load_list()
+                    MDRaisedButton:
+                        text: "导入Excel"
+                        md_bg_color: "#9b59b6"
+                        on_press: root.import_from_excel()
+
+                MDLabel:
+                    text: "数据列表（点击选中）"
+                    font_style: "Subtitle1"
+                    size_hint_y: None
+                    height: dp(30)
+
+                MDScrollView:
+                    size_hint: 1, None
+                    height: dp(350)
+                    MDBoxLayout:
+                        id: admin_table_box
+                        size_hint: 1, None
+                        height: dp(600)
+                        orientation: "vertical"
 
 <QuoteScreen>:
     name: "quote"
     MDBoxLayout:
         orientation: "vertical"
         padding: dp(10)
-        spacing: dp(10)
+        spacing: dp(8)
+
+        MDTopAppBar:
+            title: "批量报价"
+            left_action_items: [["arrow-left", lambda x: setattr(app.root, "current", "main")]]
+            elevation: 4
 
         MDBoxLayout:
             size_hint: 1, None
             height: dp(45)
-            spacing: dp(10)
+            spacing: dp(8)
+
             MDTextField:
                 id: q_search
                 hint_text: "搜索检定项目"
-                size_hint: 0.7,1
+                size_hint: 0.7, 1
+                on_text_validate: root.q_search()
+
             MDRaisedButton:
                 text: "搜索"
-                size_hint: 0.3,1
+                size_hint: 0.3, 1
                 on_press: root.q_search()
 
+        MDLabel:
+            text: "查询结果"
+            font_style: "Subtitle1"
+            size_hint_y: None
+            height: dp(25)
+
         MDScrollView:
-            size_hint: 1, 0.4
+            size_hint: 1, 0.3
             MDBoxLayout:
                 id: q_table_box
-                size_hint:1, None
+                size_hint: 1, None
+                height: dp(250)
+                orientation: "vertical"
 
         MDBoxLayout:
-            size_hint:1, None
+            size_hint: 1, None
             height: dp(45)
-            spacing: dp(10)
+            spacing: dp(8)
+
             MDTextField:
                 id: qty_input
                 hint_text: "数量"
                 text: "1"
-                size_hint:0.4,1
+                size_hint: 0.35, 1
+                input_filter: "float"
+
             MDRaisedButton:
                 text: "加入报价单"
                 md_bg_color: "#27ae60"
-                size_hint:0.6,1
+                size_hint: 0.65, 1
                 on_press: root.add_cart()
 
         MDLabel:
-            text: "报价单列表"
+            text: "报价单列表（点击选中删除）"
             font_style: "Subtitle1"
+            size_hint_y: None
+            height: dp(25)
 
         MDScrollView:
-            size_hint:1,0.4
+            size_hint: 1, 0.3
             MDBoxLayout:
                 id: cart_box
-                size_hint:1, None
+                size_hint: 1, None
+                height: dp(250)
+                orientation: "vertical"
 
         MDLabel:
             id: total_text
             text: "总金额：0.00 元"
             font_style: "H6"
             theme_text_color: "Error"
+            halign: "center"
+            size_hint_y: None
+            height: dp(40)
 
         MDBoxLayout:
             spacing: dp(5)
-            size_hint:1, None
+            size_hint: 1, None
             height: dp(45)
+
             MDRaisedButton:
                 text: "删除选中"
                 md_bg_color: "#e74c3c"
                 on_press: root.del_cart()
+
             MDRaisedButton:
-                text: "清空"
+                text: "清空报价单"
                 md_bg_color: "#95a5a6"
                 on_press: root.clear_cart()
 
-        MDTextButton:
-            text: "返回查询页"
-            on_press: app.root.current = "client"
+            MDRaisedButton:
+                text: "导出Excel"
+                md_bg_color: "#9b59b6"
+                on_press: root.export_quote_excel()
 '''
 
-# ==================== 页面逻辑 ====================
-class LoginScreen(Screen):
-    def check_pwd(self):
-        pwd = self.ids.pwd_input.text.strip()
+# ==================== 界面类 ====================
+
+class MainScreen(Screen):
+    def show_admin_login(self):
+        """显示管理员登录对话框"""
+        content = MDBoxLayout(
+            orientation="vertical",
+            spacing=dp(10),
+            padding=dp(10),
+            size_hint_y=None,
+            height=dp(150)
+        )
+        content.add_widget(MDLabel(text="请输入管理员密码："))
+        pwd_input = MDTextField(
+            hint_text="密码",
+            password=True,
+            size_hint_y=None,
+            height=dp(50)
+        )
+        content.add_widget(pwd_input)
+
+        dialog = MDDialog(
+            title="管理员验证",
+            type="custom",
+            content_cls=content,
+            buttons=[
+                MDFlatButton(text="取消", on_press=lambda x: dialog.dismiss()),
+                MDRaisedButton(
+                    text="确定",
+                    on_press=lambda x: self.check_password(pwd_input.text, dialog)
+                )
+            ]
+        )
+        dialog.open()
+
+    def check_password(self, pwd, dialog):
         if pwd == ADMIN_PASSWORD:
+            dialog.dismiss()
             self.manager.current = "admin"
         else:
-            self.show_msg("密码错误！")
+            Snackbar(text="密码错误！", duration=2).open()
 
-    def show_msg(self, txt):
-        dialog = MDDialog(text=txt, buttons=[MDRaisedButton(text="确定", on_press=lambda x: dialog.dismiss())])
-        dialog.open()
 
 class ClientScreen(Screen):
     def on_enter(self):
@@ -329,31 +435,48 @@ class ClientScreen(Screen):
     def search_data(self):
         key = self.ids.search_key.text.strip()
         self.ids.table_box.clear_widgets()
+        self.ids.tip_text.text = ""
+
         try:
             conn = sqlite3.connect(DB_NAME)
             c = conn.cursor()
             if key:
-                c.execute("SELECT project_name,model_spec,measure_range,price FROM capabilities WHERE project_name LIKE ?", (f"%{key}%",))
+                c.execute(
+                    "SELECT project_name, model_spec, measure_range, price FROM capabilities WHERE project_name LIKE ? ORDER BY project_name",
+                    (f"%{key}%",)
+                )
             else:
-                c.execute("SELECT project_name,model_spec,measure_range,price FROM capabilities")
+                c.execute("SELECT project_name, model_spec, measure_range, price FROM capabilities ORDER BY project_name")
             res = c.fetchall()
             conn.close()
+
             if not res:
                 self.ids.tip_text.text = "暂不开展此项业务"
                 return
-            self.ids.tip_text.text = ""
+
+            # 创建数据表
             table = MDDataTable(
                 size_hint=(1, None),
-                height=dp(400),
-                column_data=[("项目", dp(90)), ("型号", dp(90)), ("范围", dp(90)), ("价格", dp(70))],
-                row_data=[(i[0],i[1],i[2],i[3]) for i in res]
+                height=dp(len(res) * 45 + 50),
+                column_data=[
+                    ("序号", dp(50)),
+                    ("检定项目", dp(120)),
+                    ("型号规格", dp(120)),
+                    ("测量范围", dp(120)),
+                    ("价格", dp(80))
+                ],
+                row_data=[(str(i+1), r[0], r[1], r[2], r[3]) for i, r in enumerate(res)]
             )
             self.ids.table_box.add_widget(table)
+
         except Exception as e:
-            self.ids.tip_text.text = f"错误: {str(e)}"
+            self.ids.tip_text.text = f"查询错误: {str(e)}"
+
 
 class AdminScreen(Screen):
     editing_id = None
+    table = None
+
     def on_enter(self):
         self.load_list()
 
@@ -362,78 +485,138 @@ class AdminScreen(Screen):
         try:
             conn = sqlite3.connect(DB_NAME)
             c = conn.cursor()
-            c.execute("SELECT id,project_name,model_spec,measure_range,price FROM capabilities")
+            c.execute("SELECT id, project_name, model_spec, measure_range, price FROM capabilities ORDER BY id ASC")
             res = c.fetchall()
             conn.close()
+
+            if not res:
+                label = MDLabel(text="暂无数据", halign="center")
+                self.ids.admin_table_box.add_widget(label)
+                return
+
             table = MDDataTable(
                 size_hint=(1, None),
-                height=dp(350),
-                column_data=[("ID", dp(40)), ("项目", dp(80)), ("型号", dp(90)), ("范围", dp(90)), ("价格", dp(60))],
-                row_data=[(str(i[0]),i[1],i[2],i[3],i[4]) for i in res]
+                height=dp(len(res) * 45 + 50),
+                column_data=[
+                    ("ID", dp(40)),
+                    ("项目", dp(100)),
+                    ("型号", dp(100)),
+                    ("范围", dp(100)),
+                    ("价格", dp(70))
+                ],
+                row_data=[(str(r[0]), r[1], r[2], r[3], r[4]) for r in res],
+                use_pagination=False,
+                check=False
             )
+            table.bind(on_row_press=self.on_row_select)
             self.ids.admin_table_box.add_widget(table)
             self.table = table
+
         except Exception as e:
-            self.show_msg(f"加载失败: {str(e)}")
+            Snackbar(text=f"加载失败: {str(e)}", duration=3).open()
+
+    def on_row_select(self, instance_table, instance_row):
+        """点击行时选中"""
+        pass
+
+    def get_selected_row(self):
+        """获取选中的行数据"""
+        if self.table is None:
+            return None
+        if hasattr(self.table, 'current_row') and self.table.current_row:
+            return self.table.current_row
+        return None
 
     def save_data(self):
         p1 = self.ids.e1.text.strip()
         p2 = self.ids.e2.text.strip()
         p3 = self.ids.e3.text.strip()
         p4 = self.ids.e4.text.strip()
-        if not all([p1,p2,p3,p4]):
-            self.show_msg("所有字段不能为空！")
+
+        if not all([p1, p2, p3, p4]):
+            Snackbar(text="所有字段不能为空！", duration=2).open()
             return
+
         try:
             conn = sqlite3.connect(DB_NAME)
             c = conn.cursor()
             if self.editing_id:
-                c.execute("UPDATE capabilities SET project_name=?,model_spec=?,measure_range=?,price=? WHERE id=?",(p1,p2,p3,p4,self.editing_id))
+                c.execute(
+                    "UPDATE capabilities SET project_name=?, model_spec=?, measure_range=?, price=? WHERE id=?",
+                    (p1, p2, p3, p4, self.editing_id)
+                )
                 self.editing_id = None
                 self.ids.edit_tip.text = ""
+                msg = "修改成功！"
             else:
-                c.execute("INSERT INTO capabilities(project_name,model_spec,measure_range,price) VALUES (?,?,?,?)",(p1,p2,p3,p4))
+                c.execute(
+                    "INSERT INTO capabilities (project_name, model_spec, measure_range, price) VALUES (?,?,?,?)",
+                    (p1, p2, p3, p4)
+                )
+                msg = "保存成功！"
             conn.commit()
             conn.close()
+
             self.clear_input()
             self.load_list()
-            self.show_msg("保存成功！")
+            Snackbar(text=msg, duration=2).open()
+
         except Exception as e:
-            self.show_msg(f"保存失败: {str(e)}")
+            Snackbar(text=f"保存失败: {str(e)}", duration=3).open()
 
     def edit_data(self):
-        if not hasattr(self, 'table') or self.table is None:
-            self.show_msg("请先加载数据！")
-            return
-        row = self.table.current_row
+        row = self.get_selected_row()
         if not row:
-            self.show_msg("请选择一行数据！")
+            Snackbar(text="请选择一行数据！", duration=2).open()
             return
+
         self.editing_id = int(row[0])
         self.ids.e1.text = row[1]
         self.ids.e2.text = row[2]
         self.ids.e3.text = row[3]
         self.ids.e4.text = row[4]
-        self.ids.edit_tip.text = f"正在修改ID:{self.editing_id}"
+        self.ids.edit_tip.text = f"正在修改 ID: {self.editing_id}"
 
     def del_data(self):
-        if not hasattr(self, 'table') or self.table is None:
-            self.show_msg("请先加载数据！")
-            return
-        row = self.table.current_row
+        row = self.get_selected_row()
         if not row:
-            self.show_msg("请选择一行！")
+            Snackbar(text="请选择一行数据！", duration=2).open()
             return
+
+        # 显示确认对话框
+        dialog = MDDialog(
+            title="确认删除",
+            text=f"确定要删除 ID={row[0]} 的记录吗？",
+            buttons=[
+                MDFlatButton(text="取消", on_press=lambda x: dialog.dismiss()),
+                MDRaisedButton(
+                    text="确定删除",
+                    md_bg_color="#e74c3c",
+                    on_press=lambda x: self.confirm_delete(row[0], dialog)
+                )
+            ]
+        )
+        dialog.open()
+
+    def confirm_delete(self, rid, dialog):
         try:
             conn = sqlite3.connect(DB_NAME)
             c = conn.cursor()
-            c.execute("DELETE FROM capabilities WHERE id=?",(int(row[0]),))
+            c.execute("DELETE FROM capabilities WHERE id=?", (rid,))
             conn.commit()
             conn.close()
+
+            if self.editing_id == rid:
+                self.clear_input()
+                self.editing_id = None
+                self.ids.edit_tip.text = ""
+
+            dialog.dismiss()
             self.load_list()
-            self.show_msg("删除成功！")
+            Snackbar(text="删除成功！", duration=2).open()
+
         except Exception as e:
-            self.show_msg(f"删除失败: {str(e)}")
+            Snackbar(text=f"删除失败: {str(e)}", duration=3).open()
 
     def clear_input(self):
         self.ids.e1.text = ""
@@ -441,12 +624,121 @@ class AdminScreen(Screen):
         self.ids.e3.text = ""
         self.ids.e4.text = ""
 
-    def show_msg(self, txt):
-        dialog = MDDialog(text=txt, buttons=[MDRaisedButton(text="确定", on_press=lambda x: dialog.dismiss())])
-        dialog.open()
+    def import_from_excel(self):
+        """导入Excel文件 - Android版使用文件选择器"""
+        from android.storage import primary_external_storage_path
+        from android.permissions import request_permissions, Permission
+        import android
+
+        # 使用Android文件选择器
+        try:
+            from jnius import autoclass
+            Intent = autoclass('android.content.Intent')
+            Activity = autoclass('org.kivy.android.PythonActivity')
+            Uri = autoclass('android.net.Uri')
+            DocumentsContract = autoclass('android.provider.DocumentsContract')
+
+            # 创建文件选择Intent
+            intent = Intent(Intent.ACTION_OPEN_DOCUMENT)
+            intent.addCategory(Intent.CATEGORY_OPENABLE)
+            intent.setType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+            # 启动选择器（这里简化处理，使用kivy文件选择器）
+            self.show_file_chooser()
+
+        except:
+            # 如果无法使用Intent，使用简单的文件选择
+            self.show_file_chooser()
+
+    def show_file_chooser(self):
+        """显示文件选择对话框"""
+        from kivy.uix.filechooser import FileChooserListView
+        from kivy.uix.popup import Popup
+
+        content = BoxLayout(orientation='vertical')
+        filechooser = FileChooserListView(
+            path='/storage/emulated/0/Download/',
+            filters=['*.xlsx']
+        )
+        content.add_widget(filechooser)
+
+        btn_layout = BoxLayout(size_hint_y=None, height=dp(50))
+        cancel_btn = Button(text="取消", on_press=lambda x: popup.dismiss())
+        confirm_btn = Button(text="导入", on_press=lambda x: self.process_import(filechooser.selection, popup))
+        btn_layout.add_widget(cancel_btn)
+        btn_layout.add_widget(confirm_btn)
+        content.add_widget(btn_layout)
+
+        popup = Popup(
+            title="选择Excel文件",
+            content=content,
+            size_hint=(0.9, 0.8)
+        )
+        popup.open()
+
+    def process_import(self, selection, popup):
+        if not selection:
+            Snackbar(text="未选择文件！", duration=2).open()
+            return
+
+        file_path = selection[0]
+        popup.dismiss()
+        self.do_import(file_path)
+
+    def do_import(self, file_path):
+        try:
+            wb = load_workbook(file_path, data_only=True)
+            ws = wb.active
+
+            # 读取表头
+            headers = [cell.value for cell in next(ws.iter_rows(min_row=1, max_row=1))]
+
+            # 按列名匹配
+            mapping = {}
+            for idx, h in enumerate(headers):
+                if h in EXCEL_HEADERS:
+                    mapping[h] = idx
+
+            if len(mapping) != len(EXCEL_HEADERS):
+                Snackbar(text="Excel表头格式不匹配！", duration=3).open()
+                return
+
+            col_idx = [mapping[h] for h in EXCEL_HEADERS]
+
+            conn = sqlite3.connect(DB_NAME)
+            c = conn.cursor()
+            count = 0
+            skip = 0
+
+            for row in ws.iter_rows(min_row=2, values_only=True):
+                vals = [str(row[i]).strip() if row[i] is not None else "" for i in col_idx]
+                if any(not v for v in vals):
+                    skip += 1
+                    continue
+                c.execute(
+                    "INSERT INTO capabilities (project_name, model_spec, measure_range, price) VALUES (?,?,?,?)",
+                    vals
+                )
+                count += 1
+
+            conn.commit()
+            conn.close()
+            self.load_list()
+
+            msg = f"成功导入 {count} 条记录！"
+            if skip:
+                msg += f"\n跳过 {skip} 条不完整记录。"
+            Snackbar(text=msg, duration=4).open()
+
+        except Exception as e:
+            Snackbar(text=f"导入失败: {str(e)}", duration=3).open()
+
 
 class QuoteScreen(Screen):
-    cart_list = []
+    cart_items = []
+    q_table = None
+    cart_table = None
+
     def on_enter(self):
         self.q_search()
         self.refresh_cart()
@@ -454,99 +746,263 @@ class QuoteScreen(Screen):
     def q_search(self):
         key = self.ids.q_search.text.strip()
         self.ids.q_table_box.clear_widgets()
+
         try:
             conn = sqlite3.connect(DB_NAME)
             c = conn.cursor()
             if key:
-                c.execute("SELECT project_name,model_spec,measure_range,price FROM capabilities WHERE project_name LIKE ?",(f"%{key}%",))
+                c.execute(
+                    "SELECT project_name, model_spec, measure_range, price FROM capabilities WHERE project_name LIKE ? ORDER BY project_name",
+                    (f"%{key}%",)
+                )
             else:
-                c.execute("SELECT project_name,model_spec,measure_range,price FROM capabilities")
+                c.execute("SELECT project_name, model_spec, measure_range, price FROM capabilities ORDER BY project_name")
             res = c.fetchall()
             conn.close()
+
+            if not res:
+                label = MDLabel(text="暂无数据", halign="center")
+                self.ids.q_table_box.add_widget(label)
+                return
+
             table = MDDataTable(
                 size_hint=(1, None),
-                height=dp(220),
-                column_data=[("项目",dp(80)),("型号",dp(80)),("范围",dp(80)),("价格",dp(60))],
-                row_data=res
+                height=dp(len(res) * 45 + 50),
+                column_data=[
+                    ("项目", dp(100)),
+                    ("型号", dp(100)),
+                    ("范围", dp(100)),
+                    ("价格", dp(70))
+                ],
+                row_data=res,
+                check=False
             )
             self.ids.q_table_box.add_widget(table)
             self.q_table = table
+
         except Exception as e:
-            self.show_msg(f"查询失败: {str(e)}")
+            Snackbar(text=f"查询失败: {str(e)}", duration=2).open()
+
+    def get_selected_quote_row(self):
+        """获取选中的查询结果行"""
+        if self.q_table is None:
+            return None
+        if hasattr(self.q_table, 'current_row') and self.q_table.current_row:
+            return self.q_table.current_row
+        return None
 
     def add_cart(self):
-        if not hasattr(self, 'q_table') or self.q_table is None:
-            self.show_msg("请先搜索数据！")
-            return
-        row = self.q_table.current_row
+        row = self.get_selected_quote_row()
         if not row:
-            self.show_msg("请选择项目！")
+            Snackbar(text="请先搜索并选择项目！", duration=2).open()
             return
+
         try:
             qty = float(self.ids.qty_input.text.strip())
-            if qty <=0:
-                raise
+            if qty <= 0:
+                raise ValueError
         except:
-            self.show_msg("数量必须是正数！")
+            Snackbar(text="数量必须是正数！", duration=2).open()
             return
+
         price_num = parse_price(row[3])
         subtotal = price_num * qty
-        self.cart_list.append({
-            "name":row[0],"model":row[1],"range":row[2],"price_str":row[3],"price":price_num,"qty":qty,"sub":subtotal
+
+        self.cart_items.append({
+            "project_name": row[0],
+            "model_spec": row[1],
+            "measure_range": row[2],
+            "price_str": row[3],
+            "unit_price": price_num,
+            "quantity": qty,
+            "subtotal": subtotal
         })
+
         self.refresh_cart()
 
     def refresh_cart(self):
         self.ids.cart_box.clear_widgets()
-        if not self.cart_list:
+
+        if not self.cart_items:
             self.ids.total_text.text = "总金额：0.00 元"
             return
+
         rows = []
         total = 0
-        for item in self.cart_list:
-            rows.append((item["name"],item["model"],item["range"],item["price_str"],str(item["qty"]),f"{item['sub']:.2f}"))
-            total += item["sub"]
+        for item in self.cart_items:
+            rows.append((
+                item["project_name"],
+                item["model_spec"],
+                item["measure_range"],
+                item["price_str"],
+                str(item["quantity"]),
+                f"{item['subtotal']:.2f}"
+            ))
+            total += item["subtotal"]
+
         table = MDDataTable(
             size_hint=(1, None),
-            height=dp(200),
-            column_data=[("项目",70),("型号",70),("范围",70),("单价",50),("数量",50),("小计",60)],
-            row_data=rows
+            height=dp(len(rows) * 45 + 50),
+            column_data=[
+                ("项目", dp(80)),
+                ("型号", dp(80)),
+                ("范围", dp(80)),
+                ("单价", dp(50)),
+                ("数量", dp(40)),
+                ("小计", dp(60))
+            ],
+            row_data=rows,
+            check=False
         )
         self.ids.cart_box.add_widget(table)
-        self.ids.total_text.text = f"总金额：{total:.2f} 元"
         self.cart_table = table
+        self.ids.total_text.text = f"总金额：{total:.2f} 元"
+
+    def get_selected_cart_row(self):
+        """获取选中的报价单行"""
+        if self.cart_table is None:
+            return None
+        if hasattr(self.cart_table, 'current_row') and self.cart_table.current_row:
+            return self.cart_table.current_row
+        return None
 
     def del_cart(self):
-        if not hasattr(self, 'cart_table') or self.cart_table is None:
-            self.show_msg("报价单为空！")
-            return
-        row = self.cart_table.current_row
+        row = self.get_selected_cart_row()
         if not row:
-            self.show_msg("请选择！")
+            Snackbar(text="请选择要删除的项目！", duration=2).open()
             return
-        idx = self.cart_table.row_data.index(row)
-        del self.cart_list[idx]
+
+        # 根据项目名称匹配删除
+        for i, item in enumerate(self.cart_items):
+            if item["project_name"] == row[0] and item["model_spec"] == row[1]:
+                del self.cart_items[i]
+                break
+
         self.refresh_cart()
 
     def clear_cart(self):
-        self.cart_list.clear()
-        self.refresh_cart()
+        if not self.cart_items:
+            return
 
-    def show_msg(self,txt):
-        dialog = MDDialog(text=txt, buttons=[MDRaisedButton(text="确定", on_press=lambda x: dialog.dismiss())])
+        dialog = MDDialog(
+            title="确认清空",
+            text="确定清空当前报价单吗？",
+            buttons=[
+                MDFlatButton(text="取消", on_press=lambda x: dialog.dismiss()),
+                MDRaisedButton(
+                    text="确定清空",
+                    md_bg_color="#e74c3c",
+                    on_press=lambda x: self.do_clear_cart(dialog)
+                )
+            ]
+        )
         dialog.open()
 
-# ==================== 主应用 ====================
-class SM(ScreenManager):
-    pass
+    def do_clear_cart(self, dialog):
+        self.cart_items.clear()
+        self.refresh_cart()
+        dialog.dismiss()
+        Snackbar(text="报价单已清空", duration=2).open()
 
+    def export_quote_excel(self):
+        if not self.cart_items:
+            Snackbar(text="报价单为空！", duration=2).open()
+            return
+
+        # Android 环境下保存到下载目录
+        from android.storage import primary_external_storage_path
+        save_dir = os.path.join(primary_external_storage_path(), 'Download')
+        if not os.path.exists(save_dir):
+            save_dir = app_storage_path()
+
+        from datetime import datetime
+        filename = f"报价单_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        file_path = os.path.join(save_dir, filename)
+
+        try:
+            wb = Workbook()
+            ws = wb.active
+            ws.title = "报价单"
+
+            # 标题
+            ws.merge_cells("A1:F1")
+            ws["A1"] = "检校业务报价单"
+            ws["A1"].font = Font(name="微软雅黑", size=16, bold=True)
+            ws["A1"].alignment = Alignment(horizontal="center", vertical="center")
+            ws.row_dimensions[1].height = 35
+
+            # 表头
+            headers = ["检定项目", "型号规格", "测量范围", "单价", "数量", "小计"]
+            header_fill = PatternFill(start_color="2c3e50", end_color="2c3e50", fill_type="solid")
+            header_font = Font(name="微软雅黑", size=11, bold=True, color="FFFFFF")
+            thin_border = Border(
+                left=Side(style="thin"), right=Side(style="thin"),
+                top=Side(style="thin"), bottom=Side(style="thin")
+            )
+
+            for col, h in enumerate(headers, 1):
+                cell = ws.cell(row=2, column=col, value=h)
+                cell.fill = header_fill
+                cell.font = header_font
+                cell.alignment = Alignment(horizontal="center", vertical="center")
+                cell.border = thin_border
+
+            # 数据行
+            for row_idx, item in enumerate(self.cart_items, 3):
+                row_data = [
+                    item["project_name"],
+                    item["model_spec"],
+                    item["measure_range"],
+                    item["price_str"],
+                    item["quantity"],
+                    item["subtotal"]
+                ]
+                for col_idx, val in enumerate(row_data, 1):
+                    cell = ws.cell(row=row_idx, column=col_idx, value=val)
+                    cell.font = Font(name="微软雅黑", size=11)
+                    cell.alignment = Alignment(horizontal="center", vertical="center")
+                    cell.border = thin_border
+
+            # 合计行
+            total_row = len(self.cart_items) + 3
+            ws.merge_cells(start_row=total_row, start_column=1, end_row=total_row, end_column=5)
+            cell = ws.cell(row=total_row, column=1, value="合计")
+            cell.font = Font(name="微软雅黑", size=11, bold=True)
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+            cell.border = thin_border
+
+            total = sum(item["subtotal"] for item in self.cart_items)
+            total_cell = ws.cell(row=total_row, column=6, value=total)
+            total_cell.font = Font(name="微软雅黑", size=11, bold=True)
+            total_cell.alignment = Alignment(horizontal="center", vertical="center")
+            total_cell.border = thin_border
+
+            # 调整列宽
+            ws.column_dimensions["A"].width = 22
+            ws.column_dimensions["B"].width = 22
+            ws.column_dimensions["C"].width = 22
+            ws.column_dimensions["D"].width = 12
+            ws.column_dimensions["E"].width = 10
+            ws.column_dimensions["F"].width = 12
+
+            wb.save(file_path)
+            Snackbar(text=f"报价单已保存到:\n{file_path}", duration=4).open()
+
+        except Exception as e:
+            Snackbar(text=f"导出失败: {str(e)}", duration=3).open()
+
+
+# ==================== 主应用 ====================
 class PriceApp(MDApp):
     def build(self):
-        print("=== APP 启动 ===")
         self.theme_cls.primary_palette = "Blue"
         self.theme_cls.theme_style = "Light"
+
+        # 初始化数据库
         init_db()
+
         return Builder.load_string(KV)
+
 
 if __name__ == "__main__":
     PriceApp().run()
