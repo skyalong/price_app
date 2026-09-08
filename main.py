@@ -78,7 +78,7 @@ print(f"数据库路径: {DB_NAME}")
 try:
     from kivy.utils import platform
     if platform != 'android':
-        Window.size = (360, 640)
+        Window.size = (380, 640)
 except:
     Window.size = (360, 640)
 
