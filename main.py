@@ -31,7 +31,7 @@ class PriceApp(App):
             "Button": ["NotoSansCJK", 14, True, 1.25],
         })
         
-        init_db()
+       # init_db()
         return Builder.load_string(KV)
 
 
