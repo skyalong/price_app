@@ -47,7 +47,7 @@ class SimpleApp(App):
             layout.add_widget(label)
             
             btn = Button(
-                text="点击测试",
+                text="key test",
                 size_hint=(1, 0.2)
             )
             btn.bind(on_press=self.on_button_click)
@@ -62,7 +62,7 @@ class SimpleApp(App):
 
     def on_button_click(self, instance):
         write_log("按钮被点击")
-        instance.text = "点击成功!"
+        instance.text = "secuss!"
 
 if __name__ == "__main__":
     write_log("开始运行 SimpleApp")
