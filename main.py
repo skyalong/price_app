@@ -16,6 +16,7 @@ from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.button import Button
 from kivy.core.text import LabelBase
 from kivy.logger import Logger
+from kivy.resources import resource_add_path
 
 # 记录启动日志
 LOG_PATH = '/sdcard/simple_app_log.txt'
@@ -31,6 +32,21 @@ write_log("=" * 50)
 write_log("应用启动...")
 write_log(f"Python 版本: {sys.version}")
 
+# ==================== 注册中文字体 ====================
+try:
+    # 添加当前目录到资源路径
+    resource_add_path(os.path.dirname(os.path.abspath(__file__)))
+    
+    # 注册中文字体
+    LabelBase.register(
+        name='ChineseFont',
+        fn_regular='NotoSansSC-Regular.otf'
+    )
+    write_log("中文字体注册成功")
+except Exception as e:
+    write_log(f"中文字体注册失败: {e}")
+
+
 class SimpleApp(App):
     def build(self):
         write_log("build() 开始执行")
@@ -39,15 +55,18 @@ class SimpleApp(App):
             layout = BoxLayout(orientation='vertical', padding=50, spacing=20)
             
             label = Label(
-                text="hello world ",#"应用运行正常!\n\n如果能看到这个界面,\n说明环境配置正确。",
+                text="应用运行正常!\n\n如果能看到这个界面,\n说明环境配置正确。",
                 font_size=30,
+                font_name='ChineseFont',  # 🔑 使用注册的中文字体
                 halign='center',
                 valign='middle'
             )
             layout.add_widget(label)
             
             btn = Button(
-                text="key test",
+                text="点击测试",
+                font_size=20,
+                font_name='ChineseFont',  # 🔑 按钮也使用中文字体
                 size_hint=(1, 0.2)
             )
             btn.bind(on_press=self.on_button_click)
@@ -62,7 +81,8 @@ class SimpleApp(App):
 
     def on_button_click(self, instance):
         write_log("按钮被点击")
-        instance.text = "secuss!"
+        instance.text = "点击成功!"
+
 
 if __name__ == "__main__":
     write_log("开始运行 SimpleApp")
