@@ -39,7 +39,7 @@ class SimpleApp(App):
             layout = BoxLayout(orientation='vertical', padding=50, spacing=20)
             
             label = Label(
-                text="应用运行正常!\n\n如果能看到这个界面,\n说明环境配置正确。",
+                text="hello world ",#"应用运行正常!\n\n如果能看到这个界面,\n说明环境配置正确。",
                 font_size=30,
                 halign='center',
                 valign='middle'
