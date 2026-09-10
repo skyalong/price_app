@@ -41,7 +41,7 @@ try:
     LabelBase.register(
         name='ChineseFont',
         fn_regular= 'NotoSerifCJKsc-Regular.otf'#'NotoSansSC-Regular.otf'
-    )NotoSerifCJKsc-Regular.otf
+    )
     write_log("中文字体注册成功")
 except Exception as e:
     write_log(f"中文字体注册失败: {e}")
