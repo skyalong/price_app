@@ -19,8 +19,8 @@ from kivy.logger import Logger
 from kivy.resources import resource_add_path
 
 # 记录启动日志
-LOG_PATH = '/sdcard/simple_app_log.txt'
-
+#LOG_PATH = '/sdcard/simple_app_log.txt'
+LOG_PATH = '/storage/emulated/0/simple_app_log.txt'
 def write_log(msg):
     try:
         with open(LOG_PATH, 'a') as f:
