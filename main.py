@@ -71,7 +71,17 @@ class SimpleApp(App):
             )
             btn.bind(on_press=self.on_button_click)
             layout.add_widget(btn)
-            
+
+            ############################
+            btn1 = Button(
+                text="管理入口",
+                font_size=20,
+                font_name='ChineseFont',  # 🔑 按钮也使用中文字体
+                size_hint=(1, 0.2)
+            )
+            btn1.bind(on_press=self.on_button_click)
+            layout.add_widget(btn1)
+            ############################
             write_log("build() 执行成功")
             return layout
             
