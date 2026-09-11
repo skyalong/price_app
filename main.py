@@ -99,8 +99,8 @@ class SimpleApp(App):
             btn3.bind(on_press=self.on_button_click)
             layout.add_widget(btn3)
             ############################
-            #write_log("build() 执行成功")
-            #return layout
+            write_log("build() 执行成功")
+            return layout
             
         except Exception as e:
             write_log(f"build() 错误: {e}")
