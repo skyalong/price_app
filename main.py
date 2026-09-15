@@ -94,7 +94,38 @@ try:
 except:
     pass
 ###############################以上#############################################
+###################以下####################
+# ==================== 工具函数 ====================
+def parse_price(price_str):
+    nums = re.findall(r'\d+\.?\d*', str(price_str))
+    if nums:
+        return float(nums[0])
+    return 0.0
 
+def init_db():
+    try:
+        db_dir = os.path.dirname(DB_NAME)
+        if db_dir and not os.path.exists(db_dir):
+            os.makedirs(db_dir, exist_ok=True)
+        
+        conn = sqlite3.connect(DB_NAME)
+        c = conn.cursor()
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS capabilities (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_name TEXT NOT NULL,
+                model_spec TEXT NOT NULL,
+                measure_range TEXT NOT NULL,
+                price TEXT NOT NULL
+            )
+        """)
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"数据库初始化失败: {e}")
+        return False
+###################以上####################
 class SimpleApp(App):
     def build(self):
         write_log("build() 开始执行")
