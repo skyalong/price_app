@@ -6,11 +6,11 @@
 
 import os
 import sys
-#######################################
+###################以下####################
 import sqlite3
 import re
 from datetime import datetime
-#######################################
+###################以上####################
 # 强制使用 Kivy 2.2.1 兼容模式
 os.environ['KIVY_GL_BACKEND'] = 'gl'
 
@@ -21,7 +21,7 @@ from kivy.uix.button import Button
 from kivy.core.text import LabelBase
 from kivy.logger import Logger
 from kivy.resources import resource_add_path
-#######################################
+#######################以下################
 from kivy.lang import Builder
 from kivy.core.window import Window
 from kivy.utils import get_color_from_hex
@@ -34,7 +34,7 @@ from kivy.uix.filechooser import FileChooserListView
 #from kivy.uix.label import Label
 from kivy.clock import Clock
 #from kivy.core.text import LabelBase
-#######################################
+#########################以上##############
 # 记录启动日志
 #LOG_PATH = '/sdcard/simple_app_log.txt'
 LOG_PATH = '/storage/emulated/0/simple_app_log.txt'
@@ -62,7 +62,38 @@ try:
     write_log("中文字体注册成功")
 except Exception as e:
     write_log(f"中文字体注册失败: {e}")
+#############################以下###############################################
+# ==================== KivyMD 导入 ====================
+from kivymd.app import MDApp
+from kivymd.uix.dialog import MDDialog
+from kivymd.uix.button import MDRaisedButton, MDTextButton, MDFlatButton
+from kivymd.uix.textfield import MDTextField
+from kivymd.uix.label import MDLabel
+from kivymd.uix.datatables import MDDataTable
+from kivymd.uix.boxlayout import MDBoxLayout
+from kivymd.uix.scrollview import MDScrollView
+from kivymd.uix.toolbar import MDTopAppBar
+from kivymd.uix.snackbar import Snackbar
+from kivymd.uix.card import MDCard
 
+# ==================== 导入 openpyxl ====================
+try:
+    from openpyxl import load_workbook, Workbook
+    from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
+    HAS_OPENPYXL = True
+except:
+    HAS_OPENPYXL = False
+
+# ==================== Android 权限 ====================
+try:
+    from android.permissions import request_permissions, Permission
+    request_permissions([
+        Permission.READ_EXTERNAL_STORAGE,
+        Permission.WRITE_EXTERNAL_STORAGE,
+    ])
+except:
+    pass
+###############################以上#############################################
 
 class SimpleApp(App):
     def build(self):
