@@ -1087,7 +1087,30 @@ class PriceApp(MDApp):
         
         #init_db()
         #return Builder.load_string(KV)
-
+        
+        try:
+            layout = BoxLayout(orientation='vertical', padding=50, spacing=20)
+            
+            label = Label(
+                text="应用运行正常!\n\n如果能看到这个界面,\n说明环境配置正确。",
+                font_size=30,
+                font_name='ChineseFont',  # 🔑 使用注册的中文字体
+                halign='center',
+                valign='middle'
+            )
+            layout.add_widget(label)
+            
+            btn = Button(
+                text="点击测试",
+                font_size=20,
+                font_name='ChineseFont',  # 🔑 按钮也使用中文字体
+                size_hint=(1, 0.2)
+            )
+            btn.bind(on_press=self.on_button_click)
+            layout.add_widget(btn)
+        except Exception as e:
+                    write_log(f"build() 错误: {e}")
+                    raise
 
 if __name__ == "__main__":
     PriceApp().run()
