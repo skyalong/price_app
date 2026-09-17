@@ -997,7 +997,6 @@ class QuoteScreen(Screen):
             Snackbar(text=f"导出失败: {str(e)}", duration=3).open()
 
 ###################以上####################
-
 class SimpleApp(App):
     def build(self):
         write_log("build() 开始执行")
@@ -1062,10 +1061,36 @@ class SimpleApp(App):
         instance.text = "点击成功!"
 
 
+#if __name__ == "__main__":
+#    write_log("开始运行 SimpleApp")
+#    try:
+#        SimpleApp().run()
+#    except Exception as e:
+#        write_log(f"运行失败: {e}")
+#        raise
+###################以下####################
+# ==================== 主应用 ====================
+class PriceApp(MDApp):
+    def build(self):
+        self.theme_cls.primary_palette = "Blue"
+        self.theme_cls.theme_style = "Light"
+        
+        # 设置字体
+        self.theme_cls.font_styles.update({
+            "H4": ["NotoSansCJK", 34, False, 0.25],
+            "H5": ["NotoSansCJK", 24, False, 0],
+            "H6": ["NotoSansCJK", 20, False, 0.15],
+            "Subtitle1": ["NotoSansCJK", 16, False, 0.15],
+            "Body1": ["NotoSansCJK", 16, False, 0.5],
+            "Button": ["NotoSansCJK", 14, True, 1.25],
+        })
+        
+        init_db()
+        return Builder.load_string(KV)
+
+
 if __name__ == "__main__":
-    write_log("开始运行 SimpleApp")
-    try:
-        SimpleApp().run()
-    except Exception as e:
-        write_log(f"运行失败: {e}")
-        raise
+    PriceApp().run()
+
+
+###################以上####################
