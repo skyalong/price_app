@@ -1072,17 +1072,24 @@ class SimpleApp(App):
 # ==================== 主应用 ====================
 class PriceApp(MDApp):
     def build(self):
-        self.theme_cls.primary_palette = "Blue"
-        self.theme_cls.theme_style = "Light"
+        self.theme_cls.primary_palette = "Blue"#主色调为蓝色（按钮、标题高亮色）
+        self.theme_cls.theme_style = "Light"#浅色模式；改成`"Dark"`就是暗黑模式
         
         # 设置字体
         self.theme_cls.font_styles.update({
-            "H4": ["NotoSansCJK", 34, False, 0.25],
-            "H5": ["NotoSansCJK", 24, False, 0],
-            "H6": ["NotoSansCJK", 20, False, 0.15],
-            "Subtitle1": ["NotoSansCJK", 16, False, 0.15],
-            "Body1": ["NotoSansCJK", 16, False, 0.5],
-            "Button": ["NotoSansCJK", 14, True, 1.25],
+           
+            "H4": ["ChineseFont", 34, False, 0.25],
+            "H5": ["ChineseFont", 24, False, 0],
+            "H6": ["ChineseFont", 20, False, 0.15],
+            "Subtitle1": ["ChineseFont", 16, False, 0.15],
+            "Body1": ["ChineseFont", 16, False, 0.5],
+            "Button": ["ChineseFont", 14, True, 1.25],
+            # "H4": ["NotoSansCJK", 34, False, 0.25],
+            # "H5": ["NotoSansCJK", 24, False, 0],
+            # "H6": ["NotoSansCJK", 20, False, 0.15],
+            # "Subtitle1": ["NotoSansCJK", 16, False, 0.15],
+            # "Body1": ["NotoSansCJK", 16, False, 0.5],
+            # "Button": ["NotoSansCJK", 14, True, 1.25],
         })
         
         #init_db()
