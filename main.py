@@ -154,7 +154,7 @@ class PriceApp(MDApp):
     def build(self):
         self.theme_cls.primary_palette = "Blue"
         self.theme_cls.theme_style = "Light"
-        init_db()
+        #init_db()
         return Builder.load_string(KV)
 
 if __name__ == "__main__":
