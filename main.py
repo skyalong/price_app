@@ -31,8 +31,8 @@ class RootWidget(BoxLayout):
 class MyApp(App):
     def build(self):
         # 方式一：直接在 build 里加载 KV 字符串
-        return Builder.load_string(KV)
-
+        #return Builder.load_string(KV)
+        return 
 
 if __name__ == "__main__":
     MyApp().run()
