@@ -1,7 +1,14 @@
 # -*- coding: utf-8 -*-
+"""
+最简测试版本 - 只显示 main 界面
+按钮点击弹窗提示，不跳转
+数据库、字体注册暂时屏蔽
+"""
+
 import os
 import sys
 
+# 强制使用 Kivy 兼容模式
 os.environ['KIVY_GL_BACKEND'] = 'gl'
 
 from kivy.lang import Builder
@@ -17,44 +24,8 @@ from kivymd.uix.label import MDLabel
 from kivymd.uix.boxlayout import MDBoxLayout
 from kivymd.uix.snackbar import Snackbar
 
-import sqlite3
-import re
-
 # ==================== 全局配置 ====================
 ADMIN_PASSWORD = "432"
-
-def get_db_path():
-    try:
-        from kivy.utils import platform
-        if platform == 'android':
-            from android.storage import app_storage_path
-            return os.path.join(app_storage_path(), 'business.db')
-        else:
-            return 'business.db'
-    except:
-        return 'business.db'
-
-DB_NAME = get_db_path()
-
-def init_db():
-    try:
-        conn = sqlite3.connect(DB_NAME)
-        c = conn.cursor()
-        c.execute("""
-            CREATE TABLE IF NOT EXISTS capabilities (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                project_name TEXT NOT NULL,
-                model_spec TEXT NOT NULL,
-                measure_range TEXT NOT NULL,
-                price TEXT NOT NULL
-            )
-        """)
-        conn.commit()
-        conn.close()
-        return True
-    except Exception as e:
-        print(f"数据库初始化失败: {e}")
-        return False
 
 # ==================== KV 界面 ====================
 KV = '''
@@ -104,6 +75,7 @@ ScreenManager:
             on_press: root.show_admin_login()
 '''
 
+# ==================== 界面类 ====================
 class MainScreen(Screen):
     def show_msg(self, txt):
         dialog = MDDialog(
@@ -127,7 +99,7 @@ class MainScreen(Screen):
             size_hint_y=None,
             height=dp(50)
         )
-        content.add_widget(pwd_input)
+        content.add_child(pwd_input) if False else content.add_widget(pwd_input)
 
         dialog = MDDialog(
             title="管理员验证",
@@ -150,12 +122,14 @@ class MainScreen(Screen):
         else:
             Snackbar(text="密码错误！", duration=2).open()
 
+
+# ==================== 主应用 ====================
 class PriceApp(MDApp):
     def build(self):
         self.theme_cls.primary_palette = "Blue"
         self.theme_cls.theme_style = "Light"
-        #init_db()
         return Builder.load_string(KV)
+
 
 if __name__ == "__main__":
     PriceApp().run()
