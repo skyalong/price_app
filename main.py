@@ -78,9 +78,11 @@ RootWidget:
     spacing: 20
 
     Label:
-        text: "Hello, KV!"
-        font_size: 40
-        color: 1, 0, 0, 1
+        text: "标准仪器维检部"
+        font_style: "H4"
+        halign: "center"
+        size_hint_y: None
+        height: dp(50)
 
     Button:
         text: "点我"
@@ -101,3 +103,8 @@ class MyApp(App):
 
 if __name__ == "__main__":
     MyApp().run()
+
+        # text: "标准仪器维检部"
+        # font_size: 40
+        # font_name='ChineseFont'
+        # color: 1, 0, 0, 1
