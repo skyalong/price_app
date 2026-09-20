@@ -1,10 +1,13 @@
 # -*- coding: utf-8 -*-
-from kivy.lang import Builder
 from kivy.app import App
+from kivy.lang import Builder
+from kivy.uix.boxlayout import BoxLayout
+from kivy.uix.label import Label
+from kivy.uix.button import Button
 
-# ==================== KV 字符串 ====================
+
 KV = '''
-BoxLayout:
+RootWidget:
     orientation: 'vertical'
     padding: 20
     spacing: 20
@@ -21,16 +24,13 @@ BoxLayout:
 '''
 
 
-# ==================== 根控件类 ====================
 class RootWidget(BoxLayout):
     def on_button_click(self):
         print("按钮被点击了！")
 
 
-# ==================== 主应用 ====================
 class MyApp(App):
     def build(self):
-        # 方式一：直接在 build 里加载 KV 字符串
         return Builder.load_string(KV)
 
 
