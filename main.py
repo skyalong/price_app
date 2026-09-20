@@ -1,35 +1,36 @@
 # -*- coding: utf-8 -*-
 from kivy.lang import Builder
-from kivymd.app import MDApp
-from kivymd.uix.boxlayout import MDBoxLayout
-from kivymd.uix.button import MDRaisedButton
-from kivymd.uix.label import MDLabel
+from kivy.app import App
 
+# ==================== KV 字符串 ====================
 KV = '''
-MDBoxLayout:
+BoxLayout:
     orientation: 'vertical'
-    padding: dp(20)
-    spacing: dp(20)
+    padding: 20
+    spacing: 20
 
-    MDLabel:
-        text: "Hello, KivyMD!"
-        halign: "center"
-        font_style: "H4"
+    Label:
+        text: "Hello, KV!"
+        font_size: 40
+        color: 1, 0, 0, 1
 
-    MDRaisedButton:
+    Button:
         text: "点我"
-        pos_hint: {"center_x": 0.5}
+        font_size: 30
         on_press: root.on_button_click()
 '''
 
 
-class RootWidget(MDBoxLayout):
+# ==================== 根控件类 ====================
+class RootWidget(BoxLayout):
     def on_button_click(self):
-        print("KivyMD 按钮被点击了！")
+        print("按钮被点击了！")
 
 
-class MyApp(MDApp):
+# ==================== 主应用 ====================
+class MyApp(App):
     def build(self):
+        # 方式一：直接在 build 里加载 KV 字符串
         return Builder.load_string(KV)
 
 
