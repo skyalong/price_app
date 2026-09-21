@@ -91,7 +91,8 @@ class RootWidget(BoxLayout):
 # if __name__ == "__main__":
 #     MyApp().run()
 # ==================== 主应用 ====================
-class PriceApp(MDApp):
+#class PriceApp(MDApp):
+class PriceApp():
     def build(self):
         self.theme_cls.primary_palette = "Blue"
         self.theme_cls.theme_style = "Light"
