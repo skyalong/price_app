@@ -50,18 +50,17 @@ write_log("应用启动...")
 write_log(f"Python 版本: {sys.version}")
 
 # ==================== 注册中文字体 ====================
+FONT_AVAILABLE = False
 try:
-    # 添加当前目录到资源路径
     resource_add_path(os.path.dirname(os.path.abspath(__file__)))
-    
-    # 注册中文字体
     LabelBase.register(
         name='ChineseFont',
-        fn_regular= 'NotoSerifCJKsc-Regular.otf'#'NotoSansSC-Regular.otf'
+        fn_regular='NotoSerifCJKsc-Regular.otf'
     )
+    FONT_AVAILABLE = True
     write_log("中文字体注册成功")
 except Exception as e:
-    write_log(f"中文字体注册失败: {e}")
+    write_log(f"中文字体注册失败: {e}，将使用默认字体")
 
 # -*- coding: utf-8 -*-
 # from kivy.app import App
@@ -71,10 +70,10 @@ except Exception as e:
 # from kivy.uix.button import Button
 
 # 在 Python 里构建 KV 字符串之前
-#if FONT_AVAILABLE:
-FONT_NAME = 'ChineseFont'
-#else:
-#    FONT_NAME = 'Roboto'   # Kivy 默认字体
+if FONT_AVAILABLE:
+    FONT_NAME = 'ChineseFont'
+else:
+    FONT_NAME = 'Roboto'   # Kivy 默认字体
 
 KV = f'''
 RootWidget:
