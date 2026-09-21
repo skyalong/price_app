@@ -70,8 +70,13 @@ except Exception as e:
 # from kivy.uix.label import Label
 # from kivy.uix.button import Button
 
+# 在 Python 里构建 KV 字符串之前
+#if FONT_AVAILABLE:
+FONT_NAME = 'ChineseFont'
+#else:
+#    FONT_NAME = 'Roboto'   # Kivy 默认字体
 
-KV = '''
+KV = f'''
 RootWidget:
     orientation: 'vertical'
     padding: 20
@@ -79,7 +84,7 @@ RootWidget:
 
     Label:
         text: "Hello, KV，你好!"
-        font_name='ChineseFont'
+        font_name: '{FONT_NAME}'
         font_size: 40
         color: 1, 0, 0, 1
 
@@ -88,6 +93,23 @@ RootWidget:
         font_size: 30
         on_press: root.on_button_click()
 '''
+# KV = '''
+# RootWidget:
+#     orientation: 'vertical'
+#     padding: 20
+#     spacing: 20
+
+#     Label:
+#         text: "Hello, KV，你好!"
+#         font_name='ChineseFont'
+#         font_size: 40
+#         color: 1, 0, 0, 1
+
+#     Button:
+#         text: "点我"
+#         font_size: 30
+#         on_press: root.on_button_click()
+# '''
 
 
 class RootWidget(BoxLayout):
