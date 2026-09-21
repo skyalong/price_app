@@ -89,6 +89,7 @@ RootWidget:
 
     Button:
         text: "点我"
+        font_name: '{FONT_NAME}'
         font_size: 30
         on_press: root.on_button_click()
 '''
