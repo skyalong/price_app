@@ -78,11 +78,10 @@ RootWidget:
     spacing: 20
 
     Label:
-        text: "标准仪器维检部"
-        font_style: "H4"
-        halign: "center"
-        size_hint_y: None
-        height: dp(50)
+        text: "Hello, KV，你好!"
+        font_name='ChineseFont'
+        font_size: 40
+        color: 1, 0, 0, 1
 
     Button:
         text: "点我"
@@ -104,7 +103,41 @@ class MyApp(App):
 if __name__ == "__main__":
     MyApp().run()
 
-        # text: "标准仪器维检部"
-        # font_size: 40
-        # font_name='ChineseFont'
-        # color: 1, 0, 0, 1
+
+
+# KV = '''
+# RootWidget:
+#     orientation: 'vertical'
+#     padding: 20
+#     spacing: 20
+
+#     Label:
+#         text: "Hello, KV!"
+#         font_size: 40
+#         color: 1, 0, 0, 1
+
+#     Button:
+#         text: "点我"
+#         font_size: 30
+#         on_press: root.on_button_click()
+# '''
+
+
+# class RootWidget(BoxLayout):
+#     def on_button_click(self):
+#         print("按钮被点击了！")
+
+
+# class MyApp(App):
+#     def build(self):
+#         return Builder.load_string(KV)
+
+
+# if __name__ == "__main__":
+#     MyApp().run()
+   #     label = Label(
+    #         text="应用运行正常!\n\n如果能看到这个界面,\n说明环境配置正确。",
+    #         font_size=30,
+    #         font_name='ChineseFont',  # 🔑 使用注册的中文字体
+    #         halign='center',
+    #         valign='middle'
