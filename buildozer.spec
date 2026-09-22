@@ -1,28 +1,37 @@
 [app]
-title = Simple Test
-package.name = simpletest
-package.domain = org.test
+title = 检校价格查询系统
+package.name = pricequery
+package.domain = org.example
 
 source.dir = .
-source.include_exts = py,png,jpg,kv,atlas,otf,ttf,ttc
+source.include_exts = py,png,jpg,kv,otf,ttf,ttc,db,xlsx
 
-version = 1.0.0
+version = 1.0
 
-requirements = python3==3.11.9,kivy
+requirements = python3,kivy==2.3.0,sqlite3,openpyxl,pyjnius
 
-android.permissions = INTERNET,READ_EXTERNAL_STORAGE,WRITE_EXTERNAL_STORAGE
+# Android 权限
+android.permissions = READ_EXTERNAL_STORAGE, WRITE_EXTERNAL_STORAGE
+
+# 安卓 SDK/NDK 版本
 android.api = 33
-android.ndk = 25c
-android.sdk = 33
+android.ndk = 25b
 android.minapi = 21
-android.arch = arm64-v8a
 
-android.enable_androidx = True
-fullscreen = 0
-orientation = portrait
+# 架构
+android.archs = arm64-v8a, armeabi-v7a
 
-log_level = 2
-warn_on_root = 0
+# 全屏
+android.fullscreen = 0
 
-[buildozer]
+# 图标（自行替换）
+# icon.filename = icon.png
+
+# 引导画面
+# presplash.filename = presplash.png
+
+# 构建目录
+build_dir = .buildozer
+
+# 日志
 log_level = 2
