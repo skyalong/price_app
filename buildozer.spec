@@ -8,7 +8,7 @@ source.include_exts = py,png,jpg,kv,atlas,otf,ttf,ttc
 
 version = 1.0.0
 
-requirements = python3==3.11.9,kivy
+requirements = python3==3.11.9,kivy==2.2.1,kivymd==1.1.1
 
 android.permissions = INTERNET,READ_EXTERNAL_STORAGE,WRITE_EXTERNAL_STORAGE
 android.api = 33
