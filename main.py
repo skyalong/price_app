@@ -1,36 +1,41 @@
+# -*- coding: utf-8 -*-
 import os
 import sys
-import sqlite3
-import re
-from datetime import datetime
 
-# 强制使用 Kivy 2.2.1 兼容模式
-os.environ['KIVY_GL_BACKEND'] = 'gl'#os.environ['KIVY_ENCODING'] = 'utf-8'
-
-from kivy.app import App
-from kivy.logger import Logger
-from kivy.resources import resource_add_path
+# 强制使用兼容模式
+os.environ['KIVY_GL_BACKEND'] = 'gl'
 
 from kivy.lang import Builder
 from kivy.core.window import Window
-from kivy.utils import get_color_from_hex
 from kivy.metrics import dp
-from kivy.uix.screenmanager import ScreenManager, Screen
-from kivy.uix.boxlayout import BoxLayout
-from kivy.uix.button import Button
-from kivy.uix.popup import Popup
-from kivy.uix.filechooser import FileChooserListView
-from kivy.uix.label import Label
-from kivy.clock import Clock
+from kivy.resources import resource_add_path
 from kivy.core.text import LabelBase
 
-# 记录启动日志
-#LOG_PATH = '/sdcard/simple_app_log.txt'
-LOG_PATH = '/storage/emulated/0/simple_app_log.txt'
+from kivymd.app import MDApp
+from kivymd.uix.dialog import MDDialog
+from kivymd.uix.button import MDRaisedButton, MDFlatButton
+from kivymd.uix.textfield import MDTextField
+from kivymd.uix.label import MDLabel
+from kivymd.uix.boxlayout import MDBoxLayout
+from kivymd.uix.snackbar import Snackbar
+
+
+# ==================== 日志 ====================
+def get_log_path():
+    try:
+        from kivy.utils import platform
+        if platform == 'android':
+            return '/storage/emulated/0/simple_app_log.txt'
+        else:
+            return os.path.join(os.path.dirname(os.path.abspath(__file__)), 'simple_app_log.txt')
+    except:
+        return 'simple_app_log.txt'
+
+LOG_PATH = get_log_path()
 
 def write_log(msg):
     try:
-        with open(LOG_PATH, 'a') as f:
+        with open(LOG_PATH, 'a', encoding='utf-8') as f:
             f.write(f"{msg}\n")
     except:
         pass
@@ -38,6 +43,7 @@ def write_log(msg):
 write_log("=" * 50)
 write_log("应用启动...")
 write_log(f"Python 版本: {sys.version}")
+
 
 # ==================== 注册中文字体 ====================
 FONT_AVAILABLE = False
@@ -52,62 +58,136 @@ try:
 except Exception as e:
     write_log(f"中文字体注册失败: {e}，将使用默认字体")
 
-# 在 Python 里构建 KV 字符串之前
 if FONT_AVAILABLE:
     FONT_NAME = 'ChineseFont'
 else:
-    FONT_NAME = 'Roboto'   # Kivy 默认字体
+    FONT_NAME = 'Roboto'
 
+
+# ==================== 全局配置 ====================
+ADMIN_PASSWORD = "432"
+
+
+# ==================== KV 界面 ====================
 KV = f'''
-RootWidget:
-    orientation: 'vertical'
-    padding: 20
-    spacing: 20
+ScreenManager:
+    MainScreen:
 
-    Label:
-        text: "Hello, KV，你好123456!"
-        font_name: '{FONT_NAME}'
-        font_size: 40
-        color: 1, 0, 0, 1
+<MainScreen>:
+    name: "main"
 
-    Button:
-        text: "点我"
-        font_name: '{FONT_NAME}'
-        font_size: 30
-        on_press: root.on_button_click()
+    MDBoxLayout:
+        orientation: "vertical"
+        padding: dp(20)
+        spacing: dp(15)
+
+        MDLabel:
+            text: "标准仪器维检部"
+            font_name: '{FONT_NAME}'
+            halign: "center"
+            font_style: "H4"
+            size_hint_y: None
+            height: dp(60)
+
+        MDLabel:
+            text: "检校业务价格查询系统"
+            font_name: '{FONT_NAME}'
+            halign: "center"
+            font_style: "H5"
+            size_hint_y: None
+            height: dp(50)
+
+        MDRaisedButton:
+            text: "单价查询"
+            font_name: '{FONT_NAME}'
+            md_bg_color: "#2980b9"
+            size_hint: 1, None
+            height: dp(55)
+            on_press: root.show_msg("单价查询功能待开发")
+
+        MDRaisedButton:
+            text: "批量报价"
+            font_name: '{FONT_NAME}'
+            md_bg_color: "#8e44ad"
+            size_hint: 1, None
+            height: dp(55)
+            on_press: root.show_msg("批量报价功能待开发")
+
+        MDRaisedButton:
+            text: "管理入口"
+            font_name: '{FONT_NAME}'
+            md_bg_color: "#c0392b"
+            size_hint: 1, None
+            height: dp(55)
+            on_press: root.show_admin_login()
 '''
 
 
-class RootWidget(BoxLayout):
-    def on_button_click(self):
-        print("按钮被点击了！")
+# ==================== 界面类 ====================
+class MainScreen(Screen):
+    def show_msg(self, txt):
+        dialog = MDDialog(
+            text=txt,
+            buttons=[MDRaisedButton(text="确定", on_press=lambda x: dialog.dismiss())]
+        )
+        dialog.open()
+
+    def show_admin_login(self):
+        content = MDBoxLayout(
+            orientation="vertical",
+            spacing=dp(10),
+            padding=dp(10),
+            size_hint_y=None,
+            height=dp(150)
+        )
+        content.add_widget(MDLabel(text="请输入管理员密码：", font_name=FONT_NAME))
+        pwd_input = MDTextField(
+            hint_text="密码",
+            password=True,
+            size_hint_y=None,
+            height=dp(50)
+        )
+        content.add_widget(pwd_input)
+
+        dialog = MDDialog(
+            title="管理员验证",
+            type="custom",
+            content_cls=content,
+            buttons=[
+                MDFlatButton(text="取消", on_press=lambda x: dialog.dismiss()),
+                MDRaisedButton(
+                    text="确定",
+                    on_press=lambda x: self.check_password(pwd_input.text, dialog)
+                )
+            ]
+        )
+        dialog.open()
+
+    def check_password(self, pwd, dialog):
+        if pwd == ADMIN_PASSWORD:
+            dialog.dismiss()
+            self.show_msg("密码正确！管理功能待开发")
+        else:
+            Snackbar(text="密码错误！", duration=2).open()
 
 
-# class MyApp(App):
-#     def build(self):
-#         return Builder.load_string(KV)
-
-
-# if __name__ == "__main__":
-#     MyApp().run()
 # ==================== 主应用 ====================
-#class PriceApp(MDApp):
-class PriceApp(App):
+class PriceApp(MDApp):
     def build(self):
-        # self.theme_cls.primary_palette = "Blue"
-        # self.theme_cls.theme_style = "Light"
-        
-        # # 设置字体
-        # self.theme_cls.font_styles.update({
-        #     "H4": ["NotoSansCJK", 34, False, 0.25],
-        #     "H5": ["NotoSansCJK", 24, False, 0],
-        #     "H6": ["NotoSansCJK", 20, False, 0.15],
-        #     "Subtitle1": ["NotoSansCJK", 16, False, 0.15],
-        #     "Body1": ["NotoSansCJK", 16, False, 0.5],
-        #     "Button": ["NotoSansCJK", 14, True, 1.25],
-        # })
-        
-        #init_db()
+        self.theme_cls.primary_palette = "Blue"
+        self.theme_cls.theme_style = "Light"
+
+        # 关键：把 KivyMD 的字体样式也替换成中文字体
+        if FONT_AVAILABLE:
+            self.theme_cls.font_styles.update({
+                "H4": ["ChineseFont", 34, False, 0.25],
+                "H5": ["ChineseFont", 24, False, 0],
+                "H6": ["ChineseFont", 20, False, 0.15],
+                "Subtitle1": ["ChineseFont", 16, False, 0.15],
+                "Body1": ["ChineseFont", 16, False, 0.5],
+                "Button": ["ChineseFont", 14, True, 1.25],
+            })
+
         return Builder.load_string(KV)
 
 
