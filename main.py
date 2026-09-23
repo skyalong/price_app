@@ -133,16 +133,15 @@ class PriceApp(BoxLayout):
 class PriceAppMain(App):
     def build(self):
         # 窗口大小（PC端调试用，安卓全屏）
-        if not ANDROID:
-            Window.size = (800, 600)
+        # if not ANDROID:
+        #     Window.size = (800, 600)
         return PriceApp()
 
 
 def main():
-    init_db()
+    #init_db()
     PriceAppMain().run()
 
 
 if __name__ == "__main__":
     main()
-#（注：内容由AI生成）
