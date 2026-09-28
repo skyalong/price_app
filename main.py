@@ -2,6 +2,7 @@
 import os
 import sys
 
+# 强制使用兼容模式
 os.environ['KIVY_GL_BACKEND'] = 'gl'
 
 from kivy.lang import Builder
@@ -14,10 +15,34 @@ from kivymd.uix.screen import MDScreen
 from kivymd.uix.screenmanager import MDScreenManager
 from kivymd.uix.boxlayout import MDBoxLayout
 from kivymd.uix.label import MDLabel
-from kivymd.uix.button import MDRaisedButton, MDFlatButton
+from kivymd.uix.button import MDRaisedButton
 from kivymd.uix.textfield import MDTextField
 from kivymd.uix.dialog import MDDialog
-from kivymd.uix.datatables import MDDataTable
+
+
+# ==================== 日志 ====================
+def get_log_path():
+    try:
+        from kivy.utils import platform
+        if platform == 'android':
+            return '/storage/emulated/0/simple_app_log.txt'
+        else:
+            return os.path.join(os.path.dirname(os.path.abspath(__file__)), 'simple_app_log.txt')
+    except:
+        return 'simple_app_log.txt'
+
+LOG_PATH = get_log_path()
+
+def write_log(msg):
+    try:
+        with open(LOG_PATH, 'a', encoding='utf-8') as f:
+            f.write(f"{msg}\n")
+    except:
+        pass
+
+write_log("=" * 50)
+write_log("应用启动...")
+write_log(f"Python 版本: {sys.version}")
 
 
 # ==================== 注册中文字体 ====================
@@ -29,8 +54,9 @@ try:
         fn_regular='NotoSerifCJKsc-Regular.otf'
     )
     FONT_AVAILABLE = True
+    write_log("中文字体注册成功")
 except Exception as e:
-    print(f"字体注册失败: {e}")
+    write_log(f"中文字体注册失败: {e}，将使用默认字体")
 
 if FONT_AVAILABLE:
     FONT_NAME = 'ChineseFont'
@@ -84,7 +110,6 @@ MDScreenManager:
             padding: dp(15)
             spacing: dp(15)
 
-            # 标题
             MDLabel:
                 text: "检校业务单价查询"
                 font_name: '{FONT_NAME}'
@@ -93,7 +118,6 @@ MDScreenManager:
                 size_hint_y: None
                 height: dp(50)
 
-            # 查询行
             MDBoxLayout:
                 size_hint_y: None
                 height: dp(60)
@@ -119,42 +143,11 @@ MDScreenManager:
                     md_bg_color: "#2980b9"
                     size_hint_x: 0.25
                     on_press: root.do_search()
-
-            # 表格区（占满剩余空间）
-            MDBoxLayout:
-                id: table_container
-                size_hint_y: 1
 '''
 
 
 # ==================== 界面类 ====================
 class SingleQueryScreen(MDScreen):
-    def on_enter(self):
-        self.build_table()
-
-    def build_table(self):
-        """创建空表格，包含表头"""
-        table = MDDataTable(
-            size_hint=(1, 1),
-            use_pagination=False,
-            check=False,
-            column_data=[
-                ("序号", dp(40)),
-                ("检定项目", dp(80)),
-                ("型号规格", dp(80)),
-                ("测量范围", dp(80)),
-                ("价格", dp(60)),
-            ],
-            row_data=[
-                # 示例数据，你可以替换为从数据库读取
-                ("1", "压力表", "Y-100", "0~1.6MPa", "80.00"),
-                ("2", "万用表", "FLUKE 15B", "0~1000V", "120.00"),
-                ("3", "游标卡尺", "0-150mm", "0~150mm", "50.00"),
-            ]
-        )
-        self.ids.table_container.clear_widgets()
-        self.ids.table_container.add_widget(table)
-
     def do_search(self):
         key = self.ids.search_input.text.strip()
         if key:
@@ -180,7 +173,6 @@ class PriceApp(MDApp):
         self.theme_cls.primary_palette = "Blue"
         self.theme_cls.theme_style = "Light"
 
-        # 替换 KivyMD 字体样式
         if FONT_AVAILABLE:
             self.theme_cls.font_styles.update({
                 "H4": ["ChineseFont", 34, False, 0.25],
@@ -196,4 +188,3 @@ class PriceApp(MDApp):
 
 if __name__ == "__main__":
     PriceApp().run()
-    
