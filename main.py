@@ -1,9 +1,18 @@
 # -*- coding: utf-8 -*-
 import os
+
+# ⚠️ 必须在任何 kivy 导入之前设置
+os.environ['KIVY_GL_BACKEND'] = 'gl'
+
 import sys
 
-# 强制使用兼容模式
-os.environ['KIVY_GL_BACKEND'] = 'gl'
+# 尝试设置 KIVY_HOME 到可写目录（部分情况下可避免复制图标失败）
+try:
+    _kivy_home = os.path.join(os.path.expanduser('~'), '.kivy')
+    os.makedirs(os.path.join(_kivy_home, 'icon'), exist_ok=True)
+    os.environ.setdefault('KIVY_HOME', _kivy_home)
+except Exception:
+    pass
 
 from kivy.lang import Builder
 from kivy.metrics import dp
@@ -25,10 +34,14 @@ def get_log_path():
     try:
         from kivy.utils import platform
         if platform == 'android':
-            return '/storage/emulated/0/simple_app_log.txt'
+            try:
+                from android.storage import app_storage_path
+                return os.path.join(app_storage_path(), 'simple_app_log.txt')
+            except Exception:
+                return '/data/local/tmp/simple_app_log.txt'
         else:
             return os.path.join(os.path.dirname(os.path.abspath(__file__)), 'simple_app_log.txt')
-    except:
+    except Exception:
         return 'simple_app_log.txt'
 
 LOG_PATH = get_log_path()
@@ -37,7 +50,7 @@ def write_log(msg):
     try:
         with open(LOG_PATH, 'a', encoding='utf-8') as f:
             f.write(f"{msg}\n")
-    except:
+    except Exception:
         pass
 
 write_log("=" * 50)
@@ -48,20 +61,26 @@ write_log(f"Python 版本: {sys.version}")
 # ==================== 注册中文字体 ====================
 FONT_AVAILABLE = False
 try:
-    resource_add_path(os.path.dirname(os.path.abspath(__file__)))
-    LabelBase.register(
-        name='ChineseFont',
-        fn_regular='NotoSerifCJKsc-Regular.otf'
-    )
-    FONT_AVAILABLE = True
-    write_log("中文字体注册成功")
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    possible_paths = [
+        base_dir,
+        os.path.join(base_dir, 'assets'),
+        '.',
+    ]
+    for p in possible_paths:
+        font_file = os.path.join(p, 'NotoSerifCJKsc-Regular.otf')
+        if os.path.exists(font_file):
+            resource_add_path(p)
+            LabelBase.register(name='ChineseFont', fn_regular='NotoSerifCJKsc-Regular.otf')
+            FONT_AVAILABLE = True
+            write_log(f"中文字体注册成功: {font_file}")
+            break
+    if not FONT_AVAILABLE:
+        write_log("未找到中文字体文件，使用默认字体")
 except Exception as e:
     write_log(f"中文字体注册失败: {e}，将使用默认字体")
 
-if FONT_AVAILABLE:
-    FONT_NAME = 'ChineseFont'
-else:
-    FONT_NAME = 'Roboto'
+FONT_NAME = 'ChineseFont' if FONT_AVAILABLE else 'Roboto'
 
 
 # ==================== KV 界面 ====================
@@ -75,7 +94,6 @@ MDScreenManager:
     MDBoxLayout:
         orientation: "vertical"
 
-        # ========== 顶部工具栏 ==========
         MDBoxLayout:
             size_hint_y: None
             height: dp(56)
@@ -104,7 +122,6 @@ MDScreenManager:
                 size_hint_x: 0.33
                 on_press: root.show_msg("批量报价功能待开发")
 
-        # ========== 内容区 ==========
         MDBoxLayout:
             orientation: "vertical"
             padding: dp(15)
