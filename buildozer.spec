@@ -16,7 +16,7 @@ android.ndk = 25c
 android.sdk = 33
 android.minapi = 21
 android.arch = arm64-v8a
-
+android.copy_icons = 0
 android.enable_androidx = True
 fullscreen = 0
 orientation = portrait
