@@ -185,20 +185,21 @@ class SingleQueryScreen(MDScreen):
 
 
 # ==================== 主应用 ====================
-class PriceApp(MDApp):
+#class PriceApp(MDApp):
+class PriceApp(App):
     def build(self):
-        self.theme_cls.primary_palette = "Blue"
-        self.theme_cls.theme_style = "Light"
+        # self.theme_cls.primary_palette = "Blue"
+        # self.theme_cls.theme_style = "Light"
 
-        if FONT_AVAILABLE:
-            self.theme_cls.font_styles.update({
-                "H4": ["ChineseFont", 34, False, 0.25],
-                "H5": ["ChineseFont", 24, False, 0],
-                "H6": ["ChineseFont", 20, False, 0.15],
-                "Subtitle1": ["ChineseFont", 16, False, 0.15],
-                "Body1": ["ChineseFont", 16, False, 0.5],
-                "Button": ["ChineseFont", 14, True, 1.25],
-            })
+        # if FONT_AVAILABLE:
+        #     self.theme_cls.font_styles.update({
+        #         "H4": ["ChineseFont", 34, False, 0.25],
+        #         "H5": ["ChineseFont", 24, False, 0],
+        #         "H6": ["ChineseFont", 20, False, 0.15],
+        #         "Subtitle1": ["ChineseFont", 16, False, 0.15],
+        #         "Body1": ["ChineseFont", 16, False, 0.5],
+        #         "Button": ["ChineseFont", 14, True, 1.25],
+        #     })
 
         return Builder.load_string(KV)
 
