@@ -1,208 +1,32 @@
 # -*- coding: utf-8 -*-
-import os
-
-# ⚠️ 必须在任何 kivy 导入之前设置
-os.environ['KIVY_GL_BACKEND'] = 'gl'
-
-import sys
-
-# 尝试设置 KIVY_HOME 到可写目录（部分情况下可避免复制图标失败）
-try:
-    _kivy_home = os.path.join(os.path.expanduser('~'), '.kivy')
-    os.makedirs(os.path.join(_kivy_home, 'icon'), exist_ok=True)
-    os.environ.setdefault('KIVY_HOME', _kivy_home)
-except Exception:
-    pass
-
-from kivy.lang import Builder
-from kivy.metrics import dp
-from kivy.resources import resource_add_path
-from kivy.core.text import LabelBase
-
 from kivymd.app import MDApp
-from kivymd.uix.screen import MDScreen
-from kivymd.uix.screenmanager import MDScreenManager
-from kivymd.uix.boxlayout import MDBoxLayout
 from kivymd.uix.label import MDLabel
-from kivymd.uix.button import MDRaisedButton
-from kivymd.uix.textfield import MDTextField
-from kivymd.uix.dialog import MDDialog
+from kivymd.uix.boxlayout import MDBoxLayout
+from kivymd.uix.button import MDButton, MDButtonText
 
 
-# ==================== 日志 ====================
-def get_log_path():
-    try:
-        from kivy.utils import platform
-        if platform == 'android':
-            try:
-                from android.storage import app_storage_path
-                return os.path.join(app_storage_path(), 'simple_app_log.txt')
-            except Exception:
-                return '/data/local/tmp/simple_app_log.txt'
-        else:
-            return os.path.join(os.path.dirname(os.path.abspath(__file__)), 'simple_app_log.txt')
-    except Exception:
-        return 'simple_app_log.txt'
-
-LOG_PATH = get_log_path()
-
-def write_log(msg):
-    try:
-        with open(LOG_PATH, 'a', encoding='utf-8') as f:
-            f.write(f"{msg}\n")
-    except Exception:
-        pass
-
-write_log("=" * 50)
-write_log("应用启动...")
-write_log(f"Python 版本: {sys.version}")
-
-
-# ==================== 注册中文字体 ====================
-FONT_AVAILABLE = False
-try:
-    base_dir = os.path.dirname(os.path.abspath(__file__))
-    possible_paths = [
-        base_dir,
-        os.path.join(base_dir, 'assets'),
-        '.',
-    ]
-    for p in possible_paths:
-        font_file = os.path.join(p, 'NotoSerifCJKsc-Regular.otf')
-        if os.path.exists(font_file):
-            resource_add_path(p)
-            LabelBase.register(name='ChineseFont', fn_regular='NotoSerifCJKsc-Regular.otf')
-            FONT_AVAILABLE = True
-            write_log(f"中文字体注册成功: {font_file}")
-            break
-    if not FONT_AVAILABLE:
-        write_log("未找到中文字体文件，使用默认字体")
-except Exception as e:
-    write_log(f"中文字体注册失败: {e}，将使用默认字体")
-
-FONT_NAME = 'ChineseFont' if FONT_AVAILABLE else 'Roboto'
-
-
-# ==================== KV 界面 ====================
-KV = f'''
-MDScreenManager:
-    SingleQueryScreen:
-
-<SingleQueryScreen>:
-    name: "single_query"
-
-    MDBoxLayout:
-        orientation: "vertical"
-
-        MDBoxLayout:
-            size_hint_y: None
-            height: dp(56)
-            md_bg_color: "#2c3e50"
-            padding: dp(4), dp(4)
-            spacing: dp(4)
-
-            MDRaisedButton:
-                text: "管理入口"
-                font_name: '{FONT_NAME}'
-                md_bg_color: "#c0392b"
-                size_hint_x: 0.33
-                on_press: root.show_msg("管理入口功能待开发")
-
-            MDRaisedButton:
-                text: "单价查询"
-                font_name: '{FONT_NAME}'
-                md_bg_color: "#2980b9"
-                size_hint_x: 0.34
-                on_press: root.show_msg("当前已是单价查询页")
-
-            MDRaisedButton:
-                text: "批量报价"
-                font_name: '{FONT_NAME}'
-                md_bg_color: "#8e44ad"
-                size_hint_x: 0.33
-                on_press: root.show_msg("批量报价功能待开发")
-
-        MDBoxLayout:
-            orientation: "vertical"
-            padding: dp(15)
-            spacing: dp(15)
-
-            MDLabel:
-                text: "检校业务单价查询"
-                font_name: '{FONT_NAME}'
-                halign: "center"
-                font_style: "H5"
-                size_hint_y: None
-                height: dp(50)
-
-            MDBoxLayout:
-                size_hint_y: None
-                height: dp(60)
-                spacing: dp(10)
-
-                MDLabel:
-                    text: "检定项目："
-                    font_name: '{FONT_NAME}'
-                    size_hint_x: 0.25
-                    halign: "right"
-                    valign: "middle"
-
-                MDTextField:
-                    id: search_input
-                    font_name: '{FONT_NAME}'
-                    hint_text: "请输入关键词"
-                    size_hint_x: 0.5
-                    mode: "rectangle"
-
-                MDRaisedButton:
-                    text: "查询"
-                    font_name: '{FONT_NAME}'
-                    md_bg_color: "#2980b9"
-                    size_hint_x: 0.25
-                    on_press: root.do_search()
-'''
-
-
-# ==================== 界面类 ====================
-class SingleQueryScreen(MDScreen):
-    def do_search(self):
-        key = self.ids.search_input.text.strip()
-        if key:
-            self.show_msg(f"搜索：{key}")
-        else:
-            self.show_msg("请输入搜索关键词")
-
-    def show_msg(self, txt):
-        dialog = MDDialog(
-            text=txt,
-            buttons=[MDRaisedButton(
-                text="确定",
-                font_name=FONT_NAME,
-                on_press=lambda x: dialog.dismiss()
-            )]
-        )
-        dialog.open()
-
-
-# ==================== 主应用 ====================
-#class PriceApp(MDApp):
-class PriceApp(App):
+class MyApp(MDApp):
     def build(self):
-        # self.theme_cls.primary_palette = "Blue"
-        # self.theme_cls.theme_style = "Light"
+        layout = MDBoxLayout(
+            orientation='vertical',
+            padding=20,
+            spacing=20
+        )
+        layout.add_widget(MDLabel(
+            text="Hello KivyMD",
+            halign="center"
+        ))
+        layout.add_widget(MDButton(
+            MDButtonText(text="点我"),
+            style="elevated",          # 对应旧的 MDRaisedButton
+            pos_hint={"center_x": 0.5},
+            on_release=self.on_button_click,
+        ))
+        return layout
 
-        # if FONT_AVAILABLE:
-        #     self.theme_cls.font_styles.update({
-        #         "H4": ["ChineseFont", 34, False, 0.25],
-        #         "H5": ["ChineseFont", 24, False, 0],
-        #         "H6": ["ChineseFont", 20, False, 0.15],
-        #         "Subtitle1": ["ChineseFont", 16, False, 0.15],
-        #         "Body1": ["ChineseFont", 16, False, 0.5],
-        #         "Button": ["ChineseFont", 14, True, 1.25],
-        #     })
-
-        return Builder.load_string(KV)
+    def on_button_click(self, instance):
+        print("按钮被点击了")
 
 
 if __name__ == "__main__":
-    PriceApp().run()
+    MyApp().run()
