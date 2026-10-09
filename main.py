@@ -16,12 +16,11 @@ from kivy.uix.popup import Popup
 from kivy.core.text import LabelBase
 from kivy.utils import platform
 
-# ---- 中文字体：把 NotoSansSC-Regular.ttf 放在本文件同目录 ----
-#if os.path.exists("NotoSansSC-Regular.ttf"):
-#    LabelBase.register(name="CJK", fn_regular="NotoSansSC-Regular.ttf")
-#    FONT = "CJK"
-#else:
-#    FONT = "Roboto"   # 桌面调试用，手机上必须放字体文件
+# ---- Android 专用导入（桌面端不执行） ----
+if platform == "android":
+    from android.permissions import request_permissions, check_permission, Permission
+    from android.storage import primary_external_storage_path
+
 # ---- 中文字体：优先用项目目录字体，否则用 Windows 系统字体 ----
 def load_cjk_font():
     candidates = [
@@ -77,18 +76,13 @@ TEMPLATES = {
 }
 
 
-#def make_label(text, size_hint_x=1, bold=False, size="14sp"):
-#    lbl = Label(text=text, font_name=FONT, font_size=size,
-#               size_hint_x=size_hint_x, bold=bold,
-#                valign="middle", padding=(6, 2))
-#    lbl.bind(size=lambda inst, val: setattr(inst, "text_size", val))
-#    return lbl
 def make_label(text, size_hint_x=1, bold=False, size="14sp", **kw):
     lbl = Label(text=text, font_name=FONT, font_size=size,
                 size_hint_x=size_hint_x, bold=bold,
                 valign="middle", padding=(6, 2), **kw)
     lbl.bind(size=lambda inst, val: setattr(inst, "text_size", val))
     return lbl
+
 
 class HomeScreen(Screen):
     def __init__(self, **kw):
@@ -202,24 +196,37 @@ class CheckScreen(Screen):
 
         self.add_widget(root)
 
+    def _get_save_paths(self, fname):
+        """返回可写入的目标路径列表"""
+        paths = []
+        app = App.get_running_app()
+
+        # 1) 应用私有目录（无需权限，始终可写）
+        paths.append(os.path.join(app.user_data_dir, fname))
+
+        # 2) Android 外部存储（需要权限）
+        if platform == "android":
+            try:
+                if check_permission(Permission.WRITE_EXTERNAL_STORAGE):
+                    base = primary_external_storage_path()
+                    ext_dir = os.path.join(base, "巡检记录")
+                    os.makedirs(ext_dir, exist_ok=True)
+                    paths.append(os.path.join(ext_dir, fname))
+            except Exception as e:
+                print("外部存储路径获取失败:", e)
+
+        return paths
+
     def save(self, *_):
         week = self.week_sp.text
-        stamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         fname = "巡检记录_%s_%s_%s.csv" % (self.eq_id or "设备", self.ym, week)
         header = ["设备编号", "年月", "周次", "分组", "检查部位", "检查结果",
                   "温度(℃)", "异常情况", "巡检人(时间)", "检查人(时间)", "保存时间"]
 
-        app = App.get_running_app()
-        paths = [os.path.join(app.user_data_dir, fname)]
-        if platform == "android":
-            ext = "/sdcard/巡检记录"
-            try:
-                os.makedirs(ext, exist_ok=True)
-                paths.append(os.path.join(ext, fname))
-            except OSError:
-                pass
+        paths = self._get_save_paths(fname)
 
         saved = []
+        errors = []
         for path in paths:
             try:
                 with open(path, "w", newline="", encoding="utf-8-sig") as f:
@@ -234,13 +241,16 @@ class CheckScreen(Screen):
                                     self.checker.text.strip(),
                                     datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")])
                 saved.append(path)
-            except OSError:
-                pass
+            except Exception as e:
+                errors.append("%s\n  → %s" % (path, e))
 
         if saved:
-            self.popup("保存成功", "已保存到：\n" + "\n".join(saved))
+            msg = "已保存到：\n" + "\n".join(saved)
+            if errors:
+                msg += "\n\n部分路径失败：\n" + "\n".join(errors)
+            self.popup("保存成功", msg)
         else:
-            self.popup("保存失败", "没有可写入的目录")
+            self.popup("保存失败", "没有可写入的目录\n\n" + "\n".join(errors))
 
     @staticmethod
     def popup(title, msg):
@@ -248,16 +258,37 @@ class CheckScreen(Screen):
         box.add_widget(make_label(msg, size="13sp"))
         btn = Button(text="确定", font_name=FONT, size_hint_y=None, height="44dp")
         box.add_widget(btn)
-        p = Popup(title=title, content=box, size_hint=(0.85, 0.5), auto_dismiss=False)
+        p = Popup(title=title, content=box, size_hint=(0.85, 0.6), auto_dismiss=False)
         btn.bind(on_release=p.dismiss)
         p.open()
 
 
 class XunJianApp(App):
     def build(self):
+        # Android 平台：先请求存储权限
+        if platform == "android":
+            self._request_android_permissions()
+
         sm = ScreenManager()
         sm.add_widget(HomeScreen(name="home"))
         return sm
+
+    def _request_android_permissions(self):
+        """在应用启动时请求存储权限（异步，不阻塞 UI）"""
+        try:
+            permissions = [
+                Permission.READ_EXTERNAL_STORAGE,
+                Permission.WRITE_EXTERNAL_STORAGE,
+            ]
+            need = [p for p in permissions if not check_permission(p)]
+            if need:
+                request_permissions(need, self._on_permissions_result)
+        except Exception as e:
+            print("权限请求失败:", e)
+
+    def _on_permissions_result(self, permissions, results):
+        for p, r in zip(permissions, results):
+            print("权限 %s -> %s" % (p, "已授予" if r else "被拒绝"))
 
 
 if __name__ == "__main__":
