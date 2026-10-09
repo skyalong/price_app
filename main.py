@@ -290,6 +290,6 @@ class XunJianApp(App):
         for p, r in zip(permissions, results):
             print("权限 %s -> %s" % (p, "已授予" if r else "被拒绝"))
 
-
+#闪退版本标识
 if __name__ == "__main__":
     XunJianApp().run()
